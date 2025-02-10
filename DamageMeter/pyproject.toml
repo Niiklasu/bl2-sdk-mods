@@ -1,0 +1,14 @@
+[project]
+name = "DamageMeter"
+version = "1"
+authors = [{ name = "Niiklasu" }]
+description = """\
+Display the damage done by you and your party members. \n
+Requires the host to have this mod installed.
+"""
+
+[tool.sdkmod]
+name = "Damage Meter"
+license = {name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = ""
+version = "1"
