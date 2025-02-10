@@ -1,14 +1,27 @@
 from __future__ import annotations
+
+try:
+    assert __import__("coroutines").__version_info__ >= (1, 0), "This mod requires coroutines version 1.0 or higher"
+    assert __import__("mods_base").__version_info__ >= (1, 8), "Please update the SDK"
+    assert __import__("unrealsdk").__version_info__ >= (1, 7, 0), "Please update the SDK"
+    assert __import__("networking").__version_info__ >= (1, 1), "Please update the SDK"
+except (AssertionError, ImportError) as ex:
+    import webbrowser
+
+    webbrowser.open("https://bl-sdk.github.io/willow2-mod-db/requirements?mod=DamageMeter")
+    raise ex
+
+
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar, TypedDict, cast
 from DamageMeter import drawing
 from coroutines import start_coroutine_post_render, WaitForSeconds, PostRenderCoroutine, WaitUntil
+from mods_base import ENGINE, get_pc, hook, build_mod, options
 from mods_base.keybinds import keybind
 from mods_base.mod import CoopSupport, Game
 from networking.decorators import broadcast
 from networking.factory import add_network_functions
-from unrealsdk import find_enum, find_object
-from mods_base import ENGINE, get_pc, hook, build_mod, options
+from unrealsdk import find_enum
 from unrealsdk.unreal import BoundFunction
 
 if TYPE_CHECKING:
