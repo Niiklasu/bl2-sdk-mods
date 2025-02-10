@@ -1,9 +1,5 @@
-- track taken damage
-- option to disable background
 - track time to calculate DPS
-- find hook to hide when in lobby
-- add option to change position of meter
-- find hook to add option to keep/discard damage on reload
-- find hook to add/remove player on join instead of first damage
-- add color/background customization option
+- option to change bg color 
+- option to prevent reset on reload
 - add fancy bars
+- track taken damage

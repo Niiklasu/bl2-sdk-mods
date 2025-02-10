@@ -4,8 +4,11 @@ version = "1"
 authors = [{ name = "Niiklasu" }]
 description = """\
 Display the damage done by you and your party members. \n
-Requires the host to have this mod installed.
+Only the host can start/stop/reset the meter, other clients show the values tracked by the host. 
 """
+dependencies = [
+    "coroutines >= 1.0"
+]
 
 [tool.sdkmod]
 name = "Damage Meter"
