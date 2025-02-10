@@ -77,9 +77,6 @@ def reset_state(canvas: Canvas, font: Font = font_willowbody_18pt) -> None:
     DrawingState.width = 0
 
 
-from __Scripts.logging import log
-
-
 def get_text_width(text: str) -> int:
     values = DrawingState.canvas.TextSize(text, 0, 0)
     # super hacky but SOMETIMES the return value is just an (float, float) tuple without an ellipsis at the start
@@ -126,7 +123,6 @@ def draw_line(length: int, color: Object.Color) -> None:
 
 
 def draw_rectangle(x: int, y: int, width: int, height: int, color: Object.Color) -> None:
-    log(DrawingState.canvas.DefaultTexture)
     canvas = DrawingState.canvas
     canvas.SetPos(x, y)
     canvas.SetDrawColorStruct(color)
