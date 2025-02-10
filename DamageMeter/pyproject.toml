@@ -10,5 +10,5 @@ Requires the host to have this mod installed.
 [tool.sdkmod]
 name = "Damage Meter"
 license = {name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
-download = ""
+download = "https://github.com/Niiklasu/bl2-sdk-mods/raw/refs/heads/main/DamageMeter/DamageMeter.sdkmod"
 version = "1"

@@ -1,4 +1,5 @@
 - track taken damage
+- track time to calculate DPS
 - find hook to hide when in lobby
 - add option to change position of meter
 - find hook to add option to keep/discard damage on reload

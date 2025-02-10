@@ -1,16 +1,19 @@
 from __future__ import annotations
+from enum import Enum
 from typing import TYPE_CHECKING, TypedDict, cast
 from DamageMeter import drawing
 from mods_base.keybinds import keybind
 from mods_base.mod import CoopSupport, Game
 from networking.decorators import broadcast
 from networking.factory import add_network_functions
-from unrealsdk import find_object, find_enum
+from unrealsdk import find_enum
 from mods_base import ENGINE, hook, build_mod, options
 from unrealsdk.unreal import BoundFunction
 
 if TYPE_CHECKING:
-    from bl2 import WillowGameEngine, WillowPlayerController, WillowPawn, WorldInfo, WillowGame
+    from bl2 import WillowGameEngine, WillowPlayerController, WillowPawn, WorldInfo, WillowGame, Canvas
+
+TITLE = "Damage Meter"
 
 
 def on_default_active_change(_option: options.BoolOption, value: bool) -> None:
@@ -25,10 +28,35 @@ defaultActive = options.BoolOption(
 )
 
 
+# single source of truth for character name from game -> enum
+class CharacterClass(str, Enum):
+    AXTON = "Axton"
+    MAYA = "Maya"
+    SALVADOR = "Salvador"
+    ZER0 = "Zero"
+    GAIGE = "Gaige"
+    KRIEG = "Krieg"
+
+
+class CharacterAttributes(TypedDict):
+    color: Canvas.Color
+    display_name: str
+
+
+ATTRIBUTES: dict[CharacterClass, CharacterAttributes] = {
+    CharacterClass.AXTON: {"color": drawing.axton_green_color, "display_name": "Axton"},
+    CharacterClass.MAYA: {"color": drawing.maya_yellow_color, "display_name": "Maya"},
+    CharacterClass.SALVADOR: {"color": drawing.salvador_orange_color, "display_name": "Salvador"},
+    CharacterClass.ZER0: {"color": drawing.zero_cyan_color, "display_name": "Zer0"},
+    CharacterClass.GAIGE: {"color": drawing.gaige_purple_color, "display_name": "Gaige"},
+    CharacterClass.KRIEG: {"color": drawing.krieg_red_color, "display_name": "Krieg"},
+}
+
+
 class PlayerStats(TypedDict):
     damage: int
     # tanked_damage: int
-    class_name: str
+    character_class: CharacterClass
 
 
 class DamageMeterState:
@@ -77,7 +105,7 @@ def took_damage_from_enemy(
         new_stats[player_name] = {
             "damage": 0,
             # "tanked_damage": 0,
-            "class_name": instigator.PlayerClass.CharacterNameId.CharacterName,
+            "character_class": CharacterClass(instigator.PlayerClass.CharacterNameId.CharacterName),
         }
 
     # FinalDamage only includes flesh/armor damage
@@ -112,17 +140,20 @@ def post_render(
     if args.Canvas is None:
         return
 
-    if drawing.DrawingState.canvas is None:
-        drawing.init(args.Canvas)
+    drawing.draw_background(drawing.gray_color_bg)
+    drawing.reset_state(args.Canvas)
 
-    drawing.DrawingState.num_displayed_lines = 0
-    drawing.draw_text("DamageMeter", drawing.white_color)
+    drawing.draw_text_new_line(TITLE, drawing.gold_color)
+    # font is monospaced, so this is just a random number
+    drawing.draw_line(len(TITLE) * 2, drawing.white_color)
 
     for player_name, stats in DamageMeterState.player_stats.items():
-        drawing.draw_text(
-            player_name + " - " + stats["class_name"] + ": " + human_format(stats["damage"]),
-            drawing.white_color,
+        player_class_attributes = ATTRIBUTES[stats["character_class"]]
+        drawing.draw_text_new_line(
+            player_name + " - " + player_class_attributes["display_name"] + ": " + human_format(stats["damage"]),
+            player_class_attributes["color"],
         )
+    # cba to fix, but only now he knows the line count to know how large the bg should be
 
 
 @keybind("Show/Hide Meter", key="F10")
