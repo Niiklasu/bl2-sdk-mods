@@ -98,6 +98,10 @@ def took_damage_from_enemy(
         return
     instigator = cast("WillowPlayerController", instigator)
 
+    # ignore self damage
+    if instigator == obj.Controller:
+        return
+
     player_name = instigator.PlayerReplicationInfo.PlayerName
     new_stats = DamageMeterState.player_stats.copy()
 

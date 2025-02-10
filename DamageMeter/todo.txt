@@ -1,4 +1,5 @@
 - track taken damage
+- option to disable background
 - track time to calculate DPS
 - find hook to hide when in lobby
 - add option to change position of meter
