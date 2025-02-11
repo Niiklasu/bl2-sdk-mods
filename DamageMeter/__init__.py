@@ -99,6 +99,7 @@ opt_color_by = options.SpinnerOption(
     identifier="Colored By",
     value=ColorBy.CLASS,
     choices=[cb.value for cb in ColorBy],
+    description="Class means multiple players with the same class get the same color, Player means each player gets a unique color",
     wrap_enabled=True,
 )
 
@@ -106,7 +107,7 @@ opt_color_by = options.SpinnerOption(
 opt_show_bars = options.BoolOption(
     identifier="Show Bars",
     value=True,
-    description="Whether to show bars for the damage",
+    description="Whether to show bars for the damage or just the text",
 )
 
 
@@ -134,17 +135,17 @@ def pause_meter() -> None:
 # region Current State
 
 
-# dummy_stats: dict[str, PlayerStats] = {
-#     "Player3": {"number": 1, "damage": 1_000_000, "character_class": CharacterClass.SALVADOR},
-#     "Player5": {"number": 2, "damage": 250_000_000, "character_class": CharacterClass.GAIGE},
-#     "Player1": {"number": 3, "damage": 1_000_000_000, "character_class": CharacterClass.KRIEG},
-# }
+dummy_stats: dict[str, PlayerStats] = {
+    "Player1": {"number": 1, "damage": 1_000_000, "character_class": CharacterClass.SALVADOR},
+    "Player2": {"number": 2, "damage": 250_000_000, "character_class": CharacterClass.GAIGE},
+    "Player3": {"number": 3, "damage": 1_000_000_000, "character_class": CharacterClass.KRIEG},
+}
 
 
 class DamageMeterState:
     is_hidden: ClassVar[bool] = True
     is_paused: ClassVar[bool] = True
-    player_stats: ClassVar[dict[str, PlayerStats]] = {}
+    player_stats: ClassVar[dict[str, PlayerStats]] = dummy_stats
     highest_damage: ClassVar[int] = 1
     next_player_nr: ClassVar[int] = 0
 
@@ -299,7 +300,7 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
                 drawing.draw_bar(my_damage / current_state.highest_damage, variable_color)
             else:
                 text_color = variable_color
-                drawing.draw_hline_under_text(drawing.WHITE_COLOR)
+                drawing.draw_hline_top(drawing.WHITE_COLOR)
 
             drawing.draw_text_current_line(
                 player_name + " - " + class_attrs["display_name"],

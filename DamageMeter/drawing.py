@@ -133,7 +133,7 @@ class DrawingState:
     bg_padding_y: int = 5
 
     # hardcoding which rhs columns exists for now (dmg, %total)
-    rhs_column_widths: list[int] = [65, 45]
+    rhs_column_widths: list[int] = [70, 75]
 
 
 # endregion
@@ -145,9 +145,8 @@ def reset_state(canvas: Canvas) -> None:
     ds.canvas = canvas
     ds.canvas.Font = FONTS[opt_font.value]
 
-    # magic numbers that are <= the size of the box
-    opt_x_pos.max_value = canvas.SizeX - 200
-    opt_y_pos.max_value = canvas.SizeY - 50
+    opt_x_pos.max_value = canvas.SizeX - opt_width.value
+    opt_y_pos.max_value = canvas.SizeY - opt_line_height.value * ds.running_num_lines
 
     # update the max width/lines of the last frame
     ds.max_lines = ds.running_num_lines
@@ -194,7 +193,7 @@ def draw_text_rhs_column(text: str, color: Object.Color, index_from_right: int, 
     draw_text(
         text=text,
         color=color,
-        x=opt_width.value - sum(ds.rhs_column_widths[-1 - index_from_right :]),
+        x=opt_x_pos.value + opt_width.value - sum(ds.rhs_column_widths[-1 - index_from_right :]),
         y=opt_y_pos.value + ds.running_num_lines * opt_line_height.value + centered_offset,
     )
 
@@ -222,13 +221,11 @@ def draw_bar(percent: float, color: Object.Color) -> None:
     )
 
 
-def draw_hline_under_text(color: Object.Color, thickness: int = 1) -> None:
+def draw_hline_top(color: Object.Color, thickness: int = 1) -> None:
     ds = DrawingState
     draw_rectangle(
         x=opt_x_pos.value - ds.bg_padding_x,
-        y=opt_y_pos.value
-        + ds.running_num_lines * opt_line_height.value
-        - (opt_line_height.value - ds.text_height) // 2,
+        y=opt_y_pos.value + ds.running_num_lines * opt_line_height.value,
         width=opt_width.value + ds.bg_padding_x * 2,
         height=thickness,
         color=color,
