@@ -1,5 +1,5 @@
 - track time to calculate DPS
-- option to change bg color 
-- option to prevent reset on reload
-- add fancy bars
+- find hook if player leaves
+- (add option) prevent reset on reload
 - track taken damage
+- let user customize RHS columns (which stats to show)

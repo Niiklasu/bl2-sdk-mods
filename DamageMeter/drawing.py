@@ -1,13 +1,13 @@
 from __future__ import annotations
 from types import EllipsisType
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from mods_base import options
 from unrealsdk import find_object, make_struct
 
 if TYPE_CHECKING:
     from bl2 import Canvas, Object, Font
 
-    # might be too much boilerplate
+    # might be a bit too much boilerplate
     make_struct_color = Object.Color.make_struct
     make_struct_linear_color = Object.LinearColor.make_struct
     make_struct_vector_2d = Object.Vector2D.make_struct
@@ -21,51 +21,55 @@ else:
     make_struct_font_render_info = make_struct_font_render_info = make_struct
 
 
-# values that (potentially) changing every frame
-class DrawingState:
-    canvas: Canvas = None
-    screen_width: int = 1920
-    screen_height: int = 1080
+# region Constants
+AXTON_GREEN_COLOR: Object.Color = make_struct_color("Color", R=0, G=100, B=0, A=255)
+MAYA_YELLOW_COLOR: Object.Color = make_struct_color("Color", R=200, G=200, B=0, A=255)
+SALVADOR_ORANGE_COLOR: Object.Color = make_struct_color("Color", R=130, G=50, B=0, A=255)
+ZERO_CYAN_COLOR: Object.Color = make_struct_color("Color", R=0, G=80, B=110, A=255)
+GAIGE_PURPLE_COLOR: Object.Color = make_struct_color("Color", R=100, G=10, B=130, A=255)
+KRIEG_RED_COLOR: Object.Color = make_struct_color("Color", R=100, G=10, B=0, A=255)
 
-    # the max width/lines is the width/count of the last frame
-    running_max_width: int = 0
-    running_num_lines: int = 0
-    max_width: int = 0
-    max_lines: int = 0
+# allow to change via options in the future
+GRAY_COLOR_BG: Object.Color = make_struct_color("Color", R=125, G=125, B=125, A=255)
+BLACK_COLOR: Object.Color = make_struct_color("Color", R=0, G=0, B=0, A=255)
+WHITE_COLOR: Object.Color = make_struct_color("Color", R=255, G=255, B=255, A=255)
+GOLD_COLOR: Object.Color = make_struct_color("Color", R=255, G=165, B=0, A=255)
 
-    text_height: int = 0
-    y_inc: int = 40
-
-    x_pos: int = 35
-    y_pos: int = 400
-    bg_padding_x: int = 10
-    bg_padding_y: int = 5
-    bg_opacity: int = 255
+# some stuff that DrawText needs for the out variable so we fill with dummy values
+GLOW: Object.LinearColor = make_struct_linear_color("LinearColor", R=0, G=0, B=0, A=255)
+GLOW_OUTER: Object.Vector2D = make_struct_vector_2d("Vector2D", X=0, Y=0)
+GLOW_INNER: Object.Vector2D = make_struct_vector_2d("Vector2D", X=0, Y=0)
 
 
-def on_bg_opacity_change(option: options.SliderOption, value: int) -> None:
-    DrawingState.bg_opacity = value
+# got these from yets actionSkillCountdown mod
+FONTS: dict[str, Font] = {
+    # "willowhead": cast("Font", find_object("Font", "UI_Fonts.Font_Willowhead_8pt")),
+    "willowbody": cast("Font", find_object("Font", "ui_fonts.font_willowbody_18pt")),
+    "hudmedium": cast("Font", find_object("Font", "UI_Fonts.Font_Hud_Medium")),
+    "smallfont": cast("Font", find_object("Font", "EngineFonts.SmallFont")),
+    "tinyfont": cast("Font", find_object("Font", "EngineFonts.TinyFont")),
+}
 
+GLOW_INFO = make_struct_glow_info(
+    "DepthFieldGlowInfo",
+    bEnableGlow=True,
+    GlowColor=GLOW,
+    GlowOuterRadius=GLOW_OUTER,
+    GlowInnerRadius=GLOW_INNER,
+)
+FONT_RENDER_INFO = make_struct_font_render_info(
+    "FontRenderInfo", bClipText=True, bEnableShadow=True, GlowInfo=GLOW_INFO
+)
 
-def on_x_pos_change(option: options.SliderOption, value: int) -> None:
-    DrawingState.x_pos = value
-
-
-def on_y_pos_change(option: options.SliderOption, value: int) -> None:
-    DrawingState.y_pos = value
-
-
-def on_y_inc_change(option: options.SliderOption, value: int) -> None:
-    DrawingState.y_inc = value
-
+# endregion
+# region Options
 
 opt_bg_opacity = options.SliderOption(
     identifier="Background Opacity",
-    value=255,
+    value=150,
     min_value=0,
     max_value=255,
-    description="The opacity of the background",
-    on_change=on_bg_opacity_change,
+    description="The opacity of the background. Default value is 150",
 )
 
 opt_x_pos = options.SliderOption(
@@ -74,72 +78,78 @@ opt_x_pos = options.SliderOption(
     min_value=0,
     max_value=1720,
     description="The x position of the damage meter. Default value is 35",
-    on_change=on_x_pos_change,
 )
+
 opt_y_pos = options.SliderOption(
     identifier="Y Position",
-    value=400,
+    value=350,
     min_value=0,
     max_value=1040,
-    description="The y position of the damage meter. Default value is 400",
-    on_change=on_y_pos_change,
+    description="The y position of the damage meter. Default value is 350",
 )
 
-opt_y_inc = options.SliderOption(
-    identifier="Y Increment",
-    value=40,
+opt_line_height = options.SliderOption(
+    identifier="Line Height",
+    value=30,
     min_value=0,
     max_value=100,
-    description="The distance between each line of text. Default value is 40",
-    on_change=on_y_inc_change,
+    description="The height of each line. Default value is 30",
 )
-# helper colors
-axton_green_color: Object.Color = make_struct_color("Color", R=0, G=100, B=0, A=255)
-maya_yellow_color: Object.Color = make_struct_color("Color", R=200, G=200, B=0, A=255)
-salvador_orange_color: Object.Color = make_struct_color("Color", R=200, G=70, B=10, A=255)
-zero_cyan_color: Object.Color = make_struct_color("Color", R=0, G=120, B=160, A=255)
-gaige_purple_color: Object.Color = make_struct_color("Color", R=100, G=10, B=130, A=255)
-krieg_red_color: Object.Color = make_struct_color("Color", R=100, G=10, B=0, A=255)
 
-# allow to change via options in the future
-gray_color_bg: Object.Color = make_struct_color("Color", R=125, G=125, B=125, A=255)
-black_color: Object.Color = make_struct_color("Color", R=0, G=0, B=0, A=255)
-white_color: Object.Color = make_struct_color("Color", R=255, G=255, B=255, A=255)
-gold_color: Object.Color = make_struct_color("Color", R=255, G=165, B=0, A=255)
-
-
-# some stuff that DrawText needs for the out variable so we fill with dummy values
-glow: Object.LinearColor = make_struct_linear_color("LinearColor", R=0, G=0, B=0, A=255)
-glow_outer: Object.Vector2D = make_struct_vector_2d("Vector2D", X=0, Y=0)
-glow_inner: Object.Vector2D = make_struct_vector_2d("Vector2D", X=0, Y=0)
-
-font_willowbody_18pt: Font = cast("Font", find_object("Font", "ui_fonts.font_willowbody_18pt"))
-
-glow_info = make_struct_glow_info(
-    "DepthFieldGlowInfo",
-    bEnableGlow=True,
-    GlowColor=glow,
-    GlowOuterRadius=glow_outer,
-    GlowInnerRadius=glow_inner,
+opt_width = options.SliderOption(
+    identifier="Meter Width",
+    value=350,
+    min_value=200,
+    max_value=800,
+    description="The width of the damage meter. Default value is 350",
 )
-font_render_info = make_struct_font_render_info(
-    "FontRenderInfo", bClipText=True, bEnableShadow=True, GlowInfo=glow_info
+
+opt_font = options.DropdownOption(
+    identifier="Text Font",
+    value="hudmedium",
+    choices=list(FONTS.keys()),
+    description="The font to use for the damage meter",
 )
+
+opt_grp_drawing = options.GroupedOption(
+    identifier="Drawing",
+    children=[opt_x_pos, opt_y_pos, opt_bg_opacity, opt_width, opt_line_height, opt_font],
+)
+
+
+# endregion
+# region Current State
+class DrawingState:
+    canvas: Canvas = None
+    screen_width: int = 1920
+    screen_height: int = 1080
+
+    running_num_lines: int = 0
+    max_lines: int = 0
+
+    text_height: int = 0
+
+    bg_padding_x: int = 10
+    bg_padding_y: int = 5
+
+    # hardcoding which rhs columns exists for now (dmg, %total)
+    rhs_column_widths: list[int] = [65, 45]
+
+
+# endregion
 
 
 # has to be called every frame for other functions to work (weird setup, but alas)
-def reset_state(canvas: Canvas, font: Font = font_willowbody_18pt) -> None:
+def reset_state(canvas: Canvas) -> None:
     ds = DrawingState
     ds.canvas = canvas
-    ds.canvas.Font = font
+    ds.canvas.Font = FONTS[opt_font.value]
 
     # magic numbers that are <= the size of the box
     opt_x_pos.max_value = canvas.SizeX - 200
     opt_y_pos.max_value = canvas.SizeY - 50
 
     # update the max width/lines of the last frame
-    ds.max_width = ds.running_max_width
-    ds.running_max_width = 0
     ds.max_lines = ds.running_num_lines
     ds.running_num_lines = 0
 
@@ -159,25 +169,38 @@ def draw_text(
 ) -> None:
     ds = DrawingState
     width, height = get_text_size(text)
-    if width > ds.running_max_width:
-        ds.running_max_width = width
     ds.text_height = height
 
     canvas = ds.canvas
     canvas.SetPos(x, y)
     canvas.SetDrawColorStruct(color)
-    canvas.DrawText(text, True, 1, 1, font_render_info)
+    canvas.DrawText(text, True, 1, 1, FONT_RENDER_INFO)
 
 
-def draw_text_new_line(text: str, color: Object.Color) -> None:
+def draw_text_current_line(text: str, color: Object.Color, *, centered: bool = True) -> None:
     ds = DrawingState
+    centered_offset = opt_line_height.value // 2 - ds.text_height // 2 if centered else 0
     draw_text(
         text=text,
         color=color,
-        x=ds.x_pos,
-        y=ds.y_pos + ds.running_num_lines * ds.y_inc,
+        x=opt_x_pos.value,
+        y=opt_y_pos.value + ds.running_num_lines * opt_line_height.value + centered_offset,
     )
-    ds.running_num_lines += 1
+
+
+def draw_text_rhs_column(text: str, color: Object.Color, index_from_right: int, *, centered: bool = True) -> None:
+    ds = DrawingState
+    centered_offset = opt_line_height.value // 2 - ds.text_height // 2 if centered else 0
+    draw_text(
+        text=text,
+        color=color,
+        x=opt_width.value - sum(ds.rhs_column_widths[-1 - index_from_right :]),
+        y=opt_y_pos.value + ds.running_num_lines * opt_line_height.value + centered_offset,
+    )
+
+
+def new_line() -> None:
+    DrawingState.running_num_lines += 1
 
 
 def draw_rectangle(x: int, y: int, width: int, height: int, color: Object.Color) -> None:
@@ -188,12 +211,25 @@ def draw_rectangle(x: int, y: int, width: int, height: int, color: Object.Color)
     canvas.DrawRect(width, height, tex)
 
 
+def draw_bar(percent: float, color: Object.Color) -> None:
+    ds = DrawingState
+    draw_rectangle(
+        x=opt_x_pos.value - ds.bg_padding_x,
+        y=opt_y_pos.value + DrawingState.running_num_lines * opt_line_height.value,
+        width=int(percent * opt_width.value) + ds.bg_padding_x * 2,
+        height=opt_line_height.value,
+        color=color,
+    )
+
+
 def draw_hline_under_text(color: Object.Color, thickness: int = 1) -> None:
     ds = DrawingState
     draw_rectangle(
-        x=ds.x_pos - ds.bg_padding_x,
-        y=ds.y_pos + ds.running_num_lines * ds.y_inc - (ds.y_inc - ds.text_height) // 2,
-        width=DrawingState.max_width + 2 * ds.bg_padding_x,
+        x=opt_x_pos.value - ds.bg_padding_x,
+        y=opt_y_pos.value
+        + ds.running_num_lines * opt_line_height.value
+        - (opt_line_height.value - ds.text_height) // 2,
+        width=opt_width.value + ds.bg_padding_x * 2,
         height=thickness,
         color=color,
     )
@@ -203,11 +239,11 @@ def draw_background(color: Object.Color) -> None:
     if DrawingState.canvas is None:
         return
     ds = DrawingState
-    color.A = ds.bg_opacity
+    color.A = opt_bg_opacity.value
     draw_rectangle(
-        x=ds.x_pos - ds.bg_padding_x,
-        y=ds.y_pos - ds.bg_padding_y,
-        width=DrawingState.max_width + ds.bg_padding_x * 2,
-        height=DrawingState.max_lines * ds.y_inc + ds.bg_padding_y * 2,
+        x=opt_x_pos.value - ds.bg_padding_x,
+        y=opt_y_pos.value - ds.bg_padding_y,
+        width=opt_width.value + ds.bg_padding_x * 2,
+        height=ds.max_lines * opt_line_height.value + ds.bg_padding_y,
         color=color,
     )
