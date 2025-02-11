@@ -190,9 +190,10 @@ def took_damage_from_enemy(
     # hook is only called on the server, so we broadcast the data to the clients in a coroutine
     if DamageMeterState.is_paused:
         return
+
     # add tanked damage stats in the future
-    # if obj.Class.Name == "WillowPlayerPawn":
-    #     return
+    if obj.Class.Name == "WillowPlayerPawn":
+        return
 
     instigator = args.InstigatedBy
 
