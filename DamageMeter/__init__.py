@@ -12,7 +12,7 @@ except (AssertionError, ImportError) as ex:
     webbrowser.open("https://bl-sdk.github.io/willow2-mod-db/requirements?mod=DamageMeter")
     raise ex
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 from DamageMeter import drawing
 from coroutines import start_coroutine_post_render, WaitForSeconds, PostRenderCoroutine, WaitUntil
 from mods_base import ENGINE, get_pc, hook, build_mod, options
@@ -25,7 +25,15 @@ from unrealsdk.unreal import BoundFunction
 from ui_utils.hud_message import show_hud_message
 
 if TYPE_CHECKING:
-    from bl2 import WillowGameEngine, WillowPlayerController, WillowPawn, WorldInfo, Object
+    from bl2 import (
+        WillowGameReplicationInfo,
+        WillowPlayerController,
+        Object,
+        GameEngine,
+        WillowPawn,
+        WorldInfo,
+        WillowGameEngine,
+    )
 
 
 # region Enums, Types and Constants
@@ -59,7 +67,11 @@ class PlayerStats(TypedDict):
     character_class: CharacterClass
 
 
-# make an option for the colors in the future
+class Columns(TypedDict):
+    title: str
+    position_from_right: int
+
+
 ATTRIBUTES: dict[CharacterClass, CharacterAttributes] = {
     CharacterClass.AXTON: {"color": drawing.AXTON_GREEN_COLOR, "display_name": "Axton"},
     CharacterClass.MAYA: {"color": drawing.MAYA_YELLOW_COLOR, "display_name": "Maya"},
@@ -69,13 +81,18 @@ ATTRIBUTES: dict[CharacterClass, CharacterAttributes] = {
     CharacterClass.KRIEG: {"color": drawing.KRIEG_RED_COLOR, "display_name": "Krieg"},
 }
 
-# make an option for this in the future
 PLAYER_COLORS = [
     drawing.AXTON_GREEN_COLOR,
     drawing.ZERO_CYAN_COLOR,
     drawing.KRIEG_RED_COLOR,
     drawing.GAIGE_PURPLE_COLOR,
 ]
+
+RHS_COLUMNS: dict[str, int] = {
+    "Party%": 0,
+    "Dmg": 1,
+    "DPS": 2,
+}
 
 TITLE = "Damage Meter"
 # endregion
@@ -111,23 +128,35 @@ opt_show_bars = options.BoolOption(
 )
 
 
+def reset_damage_meter() -> None:
+    DamageMeterState.start_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
+    DamageMeterState.highest_damage = 1
+    for player in DamageMeterState.player_stats:
+        DamageMeterState.player_stats[player].update(damage=0)
+
+
 @keybind("Enable/Disable Meter", key="F10")
 def start_meter() -> None:
-    DamageMeterState.player_stats = {}
+    reset_damage_meter()
     DamageMeterState.is_hidden = not DamageMeterState.is_hidden
     DamageMeterState.is_paused = DamageMeterState.is_hidden
 
 
 @keybind("Reset Meter", key="O")
 def reset_meter() -> None:
-    DamageMeterState.player_stats = {}
-    DamageMeterState.highest_damage = 0
+    reset_damage_meter()
     show_hud_message(TITLE, "Stats resetted")
 
 
 @keybind("(Un)Pause Meter", key="P")
 def pause_meter() -> None:
     DamageMeterState.is_paused = not DamageMeterState.is_paused
+    if DamageMeterState.is_paused:
+        DamageMeterState.pause_start_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
+    else:
+        DamageMeterState.start_epoch += (
+            cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds - DamageMeterState.pause_start_epoch
+        )
     show_hud_message(TITLE, "Damage tracking paused" if DamageMeterState.is_paused else "Damage tracking resumed")
 
 
@@ -135,23 +164,50 @@ def pause_meter() -> None:
 # region Current State
 
 
-dummy_stats: dict[str, PlayerStats] = {
-    "Player1": {"number": 1, "damage": 1_000_000, "character_class": CharacterClass.SALVADOR},
-    "Player2": {"number": 2, "damage": 250_000_000, "character_class": CharacterClass.GAIGE},
-    "Player3": {"number": 3, "damage": 1_000_000_000, "character_class": CharacterClass.KRIEG},
-}
+# dummy_stats: dict[str, PlayerStats] = {
+#     "Player1": {"number": 1, "damage": 1_000_000, "character_class": CharacterClass.SALVADOR},
+#     "Player2": {"number": 2, "damage": 250_000_000, "character_class": CharacterClass.GAIGE},
+#     "Player3": {"number": 3, "damage": 1_000_000_000, "character_class": CharacterClass.KRIEG},
+# }
 
 
 class DamageMeterState:
-    is_hidden: ClassVar[bool] = True
-    is_paused: ClassVar[bool] = True
-    player_stats: ClassVar[dict[str, PlayerStats]] = dummy_stats
-    highest_damage: ClassVar[int] = 1
-    next_player_nr: ClassVar[int] = 0
+    is_hidden: bool = True
+    is_paused: bool = True
+    player_stats: dict[str, PlayerStats] = {}
+    highest_damage: int = 1
+    next_player_nr: int = 0
+    start_epoch: float = 0
+    pause_start_epoch: float = 0
 
 
 # endregion
 # region Hooks and Coroutines
+
+
+# TODO
+# @hook("WillowGame.WillowGameReplicationInfo:AddPRI")
+# def on_add_pri(
+#     obj: WillowGameReplicationInfo,
+#     args: WillowGameReplicationInfo._AddPRI.args,
+#     _ret: WillowGameReplicationInfo._AddPRI.ret,
+#     _func: BoundFunction,
+# ) -> None:
+#     print("ADD PRI")
+#     print(args.PRI.PlayerName)
+#     print(str(obj.PRIArray))
+
+
+# @hook("WillowGame.WillowGameReplicationInfo:RemovePRI")
+# def on_remove_pri(
+#     obj: WillowGameReplicationInfo,
+#     args: WillowGameReplicationInfo._RemovePRI.args,
+#     _ret: WillowGameReplicationInfo._RemovePRI.ret,
+#     _func: BoundFunction,
+# ) -> None:
+#     print("REMOVE PRI")
+#     print(args.PRI.PlayerName)
+#     print(str(obj.PRIArray))
 
 
 ## Reset my stats on spawn (changing character/reloading game)
@@ -240,7 +296,7 @@ def client_store_stats(stats: dict[str, PlayerStats]) -> None:
 
 def coroutine_send_stats_every_second() -> PostRenderCoroutine:
     while True:
-        yield WaitForSeconds(1)
+        yield WaitForSeconds(0.5)
         client_store_stats(DamageMeterState.player_stats)
 
 
@@ -272,9 +328,9 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
         # currently having to make sure the dolumn header and values are aligned.
         # user should customize columns in the future, fix that then
         drawing.draw_text_current_line("Name - Class", drawing.GOLD_COLOR)
-        drawing.draw_text_rhs_column("Party%", drawing.GOLD_COLOR, 0)
-        drawing.draw_text_rhs_column("Dmg", drawing.GOLD_COLOR, 1)
-        # drawing.draw_text_rhs_column("DPS", drawing.GOLD_COLOR, 0)
+        for title, position_from_right in RHS_COLUMNS.items():
+            drawing.draw_text_rhs_column(title, position_from_right, drawing.GOLD_COLOR)
+
         drawing.new_line()
 
         # sort by damage dealt
@@ -306,9 +362,12 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
                 player_name + " - " + class_attrs["display_name"],
                 text_color,
             )
-            drawing.draw_text_rhs_column(f"{my_damage / total_damage:.1%}", text_color, 0)
-            drawing.draw_text_rhs_column(human_format(my_damage), text_color, 1)
-            # drawing.draw_text_rhs_column(DPS, text_color, 0)
+            current_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
+            drawing.draw_text_rhs_column(f"{my_damage / total_damage:.0%}", RHS_COLUMNS["Party%"], text_color)
+            drawing.draw_text_rhs_column(human_format(my_damage), RHS_COLUMNS["Dmg"], text_color)
+            drawing.draw_text_rhs_column(
+                human_format(my_damage / (current_epoch - DamageMeterState.start_epoch)), RHS_COLUMNS["DPS"], text_color
+            )
             drawing.new_line()
 
 

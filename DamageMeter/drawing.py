@@ -1,6 +1,6 @@
 from __future__ import annotations
 from types import EllipsisType
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 from mods_base import options
 from unrealsdk import find_object, make_struct
 
@@ -21,7 +21,10 @@ else:
     make_struct_font_render_info = make_struct_font_render_info = make_struct
 
 
-# region Constants
+# region Enums, Types and Constants
+
+COLUMN_WIDTH: int = 70
+
 AXTON_GREEN_COLOR: Object.Color = make_struct_color("Color", R=0, G=100, B=0, A=255)
 MAYA_YELLOW_COLOR: Object.Color = make_struct_color("Color", R=200, G=200, B=0, A=255)
 SALVADOR_ORANGE_COLOR: Object.Color = make_struct_color("Color", R=130, G=50, B=0, A=255)
@@ -98,10 +101,10 @@ opt_line_height = options.SliderOption(
 
 opt_width = options.SliderOption(
     identifier="Meter Width",
-    value=350,
+    value=400,
     min_value=200,
     max_value=800,
-    description="The width of the damage meter. Default value is 350",
+    description="The width of the damage meter. Default value is 400",
 )
 
 opt_font = options.DropdownOption(
@@ -131,9 +134,6 @@ class DrawingState:
 
     bg_padding_x: int = 10
     bg_padding_y: int = 5
-
-    # hardcoding which rhs columns exists for now (dmg, %total)
-    rhs_column_widths: list[int] = [70, 75]
 
 
 # endregion
@@ -166,6 +166,7 @@ def draw_text(
     x: int = 0,
     y: int = 0,
 ) -> None:
+    """Draws text at the given position with the given color. The position is the top left corner of the text"""
     ds = DrawingState
     width, height = get_text_size(text)
     ds.text_height = height
@@ -177,6 +178,11 @@ def draw_text(
 
 
 def draw_text_current_line(text: str, color: Object.Color, *, centered: bool = True) -> None:
+    """
+    Draws the text in the current line, calculated by the line count and line height.
+
+    To get increase the line count and get into a new line call new_line().
+    """
     ds = DrawingState
     centered_offset = opt_line_height.value // 2 - ds.text_height // 2 if centered else 0
     draw_text(
@@ -187,22 +193,30 @@ def draw_text_current_line(text: str, color: Object.Color, *, centered: bool = T
     )
 
 
-def draw_text_rhs_column(text: str, color: Object.Color, index_from_right: int, *, centered: bool = True) -> None:
+def draw_text_rhs_column(text: str, position_from_right: int, color: Object.Color, *, centered: bool = True) -> None:
+    """
+    Draws text in the current line, but from the right side of the meter.
+
+    A value of 0 for position_from_right means the rightmost column.
+    Cendered specifies whether to vertically center the text.
+    """
     ds = DrawingState
     centered_offset = opt_line_height.value // 2 - ds.text_height // 2 if centered else 0
     draw_text(
         text=text,
         color=color,
-        x=opt_x_pos.value + opt_width.value - sum(ds.rhs_column_widths[-1 - index_from_right :]),
+        x=opt_x_pos.value + opt_width.value - COLUMN_WIDTH * (position_from_right + 1),
         y=opt_y_pos.value + ds.running_num_lines * opt_line_height.value + centered_offset,
     )
 
 
 def new_line() -> None:
+    """Moves the current line down by the line height"""
     DrawingState.running_num_lines += 1
 
 
 def draw_rectangle(x: int, y: int, width: int, height: int, color: Object.Color) -> None:
+    """Draws a rectangle at the given position with the given size and color"""
     canvas = DrawingState.canvas
     canvas.SetPos(x, y)
     canvas.SetDrawColorStruct(color)
@@ -211,6 +225,7 @@ def draw_rectangle(x: int, y: int, width: int, height: int, color: Object.Color)
 
 
 def draw_bar(percent: float, color: Object.Color) -> None:
+    """Draws a bar at the current line, that is exactly one line tall and fills horizantally to the given percentage with the given color"""
     ds = DrawingState
     draw_rectangle(
         x=opt_x_pos.value - ds.bg_padding_x,
@@ -222,6 +237,7 @@ def draw_bar(percent: float, color: Object.Color) -> None:
 
 
 def draw_hline_top(color: Object.Color, thickness: int = 1) -> None:
+    """Draws a small horizontal line at the top of the current line with the given color"""
     ds = DrawingState
     draw_rectangle(
         x=opt_x_pos.value - ds.bg_padding_x,
@@ -233,6 +249,7 @@ def draw_hline_top(color: Object.Color, thickness: int = 1) -> None:
 
 
 def draw_background(color: Object.Color) -> None:
+    """Draws the background of the meter with the given color"""
     if DrawingState.canvas is None:
         return
     ds = DrawingState

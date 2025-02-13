@@ -1,5 +1,8 @@
-- track time to calculate DPS
+- coop DPS
 - find hook if player leaves
-- (add option) prevent reset on reload
 - track taken damage
-- let user customize RHS columns (which stats to show)
+- (add option) toggle RHS columns (which stats to show)
+
+- (add option, maybe) prevent reset on reload
+- (add option, maybe) customize colors
+- (add option, maybe) customize column width
