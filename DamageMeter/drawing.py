@@ -23,7 +23,6 @@ else:
 
 # region Enums, Types and Constants
 
-COLUMN_WIDTH: int = 70
 
 AXTON_GREEN_COLOR: Object.Color = make_struct_color("Color", R=0, G=100, B=0, A=255)
 MAYA_YELLOW_COLOR: Object.Color = make_struct_color("Color", R=200, G=200, B=0, A=255)
@@ -93,18 +92,18 @@ opt_y_pos = options.SliderOption(
 
 opt_line_height = options.SliderOption(
     identifier="Line Height",
-    value=30,
-    min_value=0,
-    max_value=100,
-    description="The height of each line. Default value is 30",
+    value=40,
+    min_value=10,
+    max_value=200,
+    description="The height of each line. Default value is 40",
 )
 
 opt_width = options.SliderOption(
     identifier="Meter Width",
-    value=400,
+    value=426,
     min_value=200,
-    max_value=800,
-    description="The width of the damage meter. Default value is 400",
+    max_value=1000,
+    description="The width of the damage meter. Default value is 425",
 )
 
 opt_font = options.DropdownOption(
@@ -114,9 +113,18 @@ opt_font = options.DropdownOption(
     description="The font to use for the damage meter",
 )
 
-opt_grp_drawing = options.GroupedOption(
+opt_column_width = options.SliderOption(
+    identifier="Column Width",
+    value=70,
+    min_value=10,
+    max_value=200,
+    description="The width of each column in the damage meter. Default value is 70",
+)
+
+opt_grp_drawing = options.NestedOption(
     identifier="Drawing",
-    children=[opt_x_pos, opt_y_pos, opt_bg_opacity, opt_width, opt_line_height, opt_font],
+    children=[opt_x_pos, opt_y_pos, opt_bg_opacity, opt_width, opt_line_height, opt_column_width, opt_font],
+    description="Options for the drawing of the damage meter",
 )
 
 
@@ -205,7 +213,7 @@ def draw_text_rhs_column(text: str, position_from_right: int, color: Object.Colo
     draw_text(
         text=text,
         color=color,
-        x=opt_x_pos.value + opt_width.value - COLUMN_WIDTH * (position_from_right + 1),
+        x=opt_x_pos.value + opt_width.value - opt_column_width.value * (position_from_right + 1),
         y=opt_y_pos.value + ds.running_num_lines * opt_line_height.value + centered_offset,
     )
 
@@ -230,7 +238,7 @@ def draw_bar(percent: float, color: Object.Color) -> None:
     draw_rectangle(
         x=opt_x_pos.value - ds.bg_padding_x,
         y=opt_y_pos.value + DrawingState.running_num_lines * opt_line_height.value,
-        width=int(percent * opt_width.value) + ds.bg_padding_x * 2,
+        width=int(percent * (opt_width.value + ds.bg_padding_x * 2)),
         height=opt_line_height.value,
         color=color,
     )
@@ -248,7 +256,7 @@ def draw_hline_top(color: Object.Color, thickness: int = 1) -> None:
     )
 
 
-def draw_background(color: Object.Color) -> None:
+def draw_background(color: Object.Color = GRAY_COLOR_BG) -> None:
     """Draws the background of the meter with the given color"""
     if DrawingState.canvas is None:
         return

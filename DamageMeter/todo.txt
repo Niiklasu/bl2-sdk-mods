@@ -1,8 +1,7 @@
-- coop DPS
-- find hook if player leaves
-- track taken damage
-- (add option) toggle RHS columns (which stats to show)
-- (add option) start timer on first damage or when toggled on
+- show meter in (drawing) settings 
+
 - (add option, maybe) prevent reset on reload
 - (add option, maybe) customize colors
-- (add option, maybe) customize column width
+
+- track taken damage
+- REFACTOR: better hook and let clients compute separately (maybe from display dmg number)

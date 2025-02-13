@@ -1,4 +1,7 @@
 from __future__ import annotations
+from collections import OrderedDict
+
+from coroutines.loop import TickCoroutine, start_coroutine_tick
 
 try:
     assert __import__("coroutines").__version_info__ >= (1, 0), "This mod requires coroutines version 1.0 or higher"
@@ -18,7 +21,7 @@ from coroutines import start_coroutine_post_render, WaitForSeconds, PostRenderCo
 from mods_base import ENGINE, get_pc, hook, build_mod, options
 from mods_base.keybinds import keybind
 from mods_base.mod import CoopSupport, Game
-from networking.decorators import broadcast
+from networking.decorators import broadcast, targeted
 from networking.factory import add_network_functions
 from unrealsdk import find_enum
 from unrealsdk.unreal import BoundFunction
@@ -26,7 +29,8 @@ from ui_utils.hud_message import show_hud_message
 
 if TYPE_CHECKING:
     from bl2 import (
-        WillowGameReplicationInfo,
+        PlayerReplicationInfo,
+        WillowGameInfo,
         WillowPlayerController,
         Object,
         GameEngine,
@@ -39,7 +43,12 @@ if TYPE_CHECKING:
 # region Enums, Types and Constants
 
 
-# maybe overengineered but whatever, maybe this will be useful in the future
+class ColumnType(str, Enum):
+    PARTY_PERCENT = "Party%"
+    DAMAGE = "Dmg"
+    DPS = "DPS"
+
+
 class ColorBy(str, Enum):
     PLAYER = "Player"
     CLASS = "Class"
@@ -65,12 +74,8 @@ class PlayerStats(TypedDict):
     damage: int
     # tanked_damage: int
     character_class: CharacterClass
+    dps: int
     pause_dps: int
-
-
-class Columns(TypedDict):
-    title: str
-    position_from_right: int
 
 
 ATTRIBUTES: dict[CharacterClass, CharacterAttributes] = {
@@ -89,11 +94,6 @@ PLAYER_COLORS = [
     drawing.GAIGE_PURPLE_COLOR,
 ]
 
-RHS_COLUMNS: dict[str, int] = {
-    "Party%": 0,
-    "Dmg": 1,
-    "DPS": 2,
-}
 
 TITLE = "Damage Meter"
 # endregion
@@ -128,43 +128,90 @@ opt_show_bars = options.BoolOption(
     description="Whether to show bars for the damage or just the text",
 )
 
+opt_show_class = options.BoolOption(
+    identifier="Show Class",
+    value=True,
+    description="Whether to show the class of the player or not",
+)
+
+
+def toggle_columns(type: ColumnType, value: bool) -> None:
+    RHS_COLUMNS[type] = value
+
+
+opt_show_dps = options.BoolOption(
+    identifier="Show DPS",
+    value=True,
+    description="Whether to show the DPS column or not",
+)
+
+opt_show_total_dmg = options.BoolOption(
+    identifier="Show Total Damage",
+    value=True,
+    description="Whether to show the total damage column or not",
+)
+
+opt_show_party_percent = options.BoolOption(
+    identifier="Show Party Percentage",
+    value=True,
+    description="Whether to show the party percentage column or not",
+)
+
+RHS_COLUMNS: dict[ColumnType, options.BoolOption] = OrderedDict(
+    [
+        (ColumnType.PARTY_PERCENT, opt_show_party_percent),
+        (ColumnType.DAMAGE, opt_show_total_dmg),
+        (ColumnType.DPS, opt_show_dps),
+    ]
+)
+
+opt_grp_columns = options.GroupedOption(
+    identifier="Columns",
+    children=[opt_show_party_percent, opt_show_total_dmg, opt_show_dps],
+    description="Which columns to show in the damage meter",
+)
+
 
 def reset_damage_meter() -> None:
-    DamageMeterState.highest_damage = 1
+    DamageMeterState.highest_damage = 0
     for player in DamageMeterState.player_stats:
-        DamageMeterState.player_stats[player].update(damage=0)
+        DamageMeterState.player_stats[player].update(damage=0, dps=0, pause_dps=0)
 
 
 @keybind("Enable/Disable Meter", key="F10")
 def start_meter() -> None:
-    reset_damage_meter()
     DamageMeterState.is_hidden = not DamageMeterState.is_hidden
     DamageMeterState.is_paused = DamageMeterState.is_hidden
+    if not is_client():
+        reset_damage_meter()
 
 
 @keybind("Reset Meter", key="O")
 def reset_meter() -> None:
+    if is_client():
+        return
     reset_damage_meter()
     show_hud_message(TITLE, "Stats resetted")
 
 
 @keybind("(Un)Pause Meter", key="P")
 def pause_meter() -> None:
+    if is_client():
+        return
+    clients_store_stats(DamageMeterState.player_stats, DamageMeterState.is_paused)
     DamageMeterState.is_paused = not DamageMeterState.is_paused
     if DamageMeterState.is_paused:
         for player in DamageMeterState.player_stats:
-            current_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
             DamageMeterState.player_stats[player].update(
                 pause_dps=human_format(
-                    DamageMeterState.player_stats[player]["damage"] / (current_epoch - DamageMeterState.start_epoch + 1)
+                    DamageMeterState.player_stats[player]["damage"]
+                    / (get_current_epoch() - DamageMeterState.start_epoch + 1)
                 )
             )
-        DamageMeterState.pause_start_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
+        DamageMeterState.pause_start_epoch = get_current_epoch()
     else:
-        DamageMeterState.start_epoch += (
-            cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds - DamageMeterState.pause_start_epoch
-        )
-    show_hud_message(TITLE, "Damage tracking paused" if DamageMeterState.is_paused else "Damage tracking resumed")
+        DamageMeterState.start_epoch += get_current_epoch() - DamageMeterState.pause_start_epoch
+    show_hud_message(TITLE, "Damage tracking " + "paused" if DamageMeterState.is_paused else "resumed")
 
 
 # endregion
@@ -172,9 +219,9 @@ def pause_meter() -> None:
 
 
 # dummy_stats: dict[str, PlayerStats] = {
-#     "Player1": {"number": 1, "damage": 1_000_000, "character_class": CharacterClass.SALVADOR},
-#     "Player2": {"number": 2, "damage": 250_000_000, "character_class": CharacterClass.GAIGE},
-#     "Player3": {"number": 3, "damage": 1_000_000_000, "character_class": CharacterClass.KRIEG},
+#     "Player1": {"number": 1, "damage": 0, "character_class": CharacterClass.SALVADOR, "dps": 0, "pause_dps": 0},
+#     "Player2": {"number": 2, "damage": 0, "character_class": CharacterClass.GAIGE, "dps": 0, "pause_dps": 0},
+#     "Player3": {"number": 3, "damage": 0, "character_class": CharacterClass.KRIEG, "dps": 0, "pause_dps": 0},
 # }
 
 
@@ -182,47 +229,40 @@ class DamageMeterState:
     is_hidden: bool = True
     is_paused: bool = True
     player_stats: dict[str, PlayerStats] = {}
-    highest_damage: int = 1
+    highest_damage: int = 0
     next_player_nr: int = 0
     start_epoch: float = 0
     pause_start_epoch: float = 0
 
+    # for the host to keep track of the clients
+    # only necessary because broadcoast sends too early and causes some console spam on the client that isnt game breaking but annoying
+    PRIs: list[PlayerReplicationInfo] = []
+
 
 # endregion
-# region Hooks and Coroutines
+# region Functions, Hooks and Coroutines
+
+## helper functions
 
 
-# TODO
-# @hook("WillowGame.WillowGameReplicationInfo:AddPRI")
-# def on_add_pri(
-#     obj: WillowGameReplicationInfo,
-#     args: WillowGameReplicationInfo._AddPRI.args,
-#     _ret: WillowGameReplicationInfo._AddPRI.ret,
-#     _func: BoundFunction,
-# ) -> None:
-#     print("ADD PRI")
-#     print(args.PRI.PlayerName)
-#     print(str(obj.PRIArray))
+def get_current_epoch() -> float:
+    return cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
 
 
-# @hook("WillowGame.WillowGameReplicationInfo:RemovePRI")
-# def on_remove_pri(
-#     obj: WillowGameReplicationInfo,
-#     args: WillowGameReplicationInfo._RemovePRI.args,
-#     _ret: WillowGameReplicationInfo._RemovePRI.ret,
-#     _func: BoundFunction,
-# ) -> None:
-#     print("REMOVE PRI")
-#     print(args.PRI.PlayerName)
-#     print(str(obj.PRIArray))
+# how to check for client from the slide mod by @juso40
+e_net_mode: WorldInfo.ENetMode = cast("WorldInfo.ENetMode", find_enum("ENetMode"))
 
 
-## Reset my stats on spawn (changing character/reloading game)
+def is_client() -> bool:
+    return cast("WillowGameEngine", ENGINE).GetCurrentWorldInfo().NetMode == e_net_mode.NM_Client
+
+
+## Add/Remove Players
 
 
 @hook("WillowGame.WillowPlayerController:ShouldLoadSaveGameOnSpawn")
 def on_spawn(
-    pc: WillowPlayerController,
+    obj: WillowPlayerController,
     args: WillowPlayerController._ShouldLoadSaveGameOnSpawn.args,
     _ret: WillowPlayerController._ShouldLoadSaveGameOnSpawn.ret,
     _func: BoundFunction,
@@ -232,16 +272,38 @@ def on_spawn(
         return
     if not args.bIsInitialSpawn:
         return
-    DamageMeterState.player_stats[pc.PlayerReplicationInfo.PlayerName] = {
+    DamageMeterState.player_stats[obj.PlayerReplicationInfo.PlayerName] = {
         "number": DamageMeterState.next_player_nr,
         "damage": 0,
         # "tanked_damage": 0,
-        "character_class": CharacterClass(pc.PlayerClass.CharacterNameId.CharacterName),
+        "character_class": CharacterClass(obj.PlayerClass.CharacterNameId.CharacterName),
+        "pause_dps": 0,
+        "dps": 0,
     }
     DamageMeterState.next_player_nr += 1
+    DamageMeterState.PRIs.append(obj.PlayerReplicationInfo)
 
 
-## Registering and Distributing Damage
+@hook("WillowGame.WillowGameInfo:Logout")
+def on_logout(
+    obj: WillowGameInfo,
+    args: WillowGameInfo._Logout.args,
+    ret: WillowGameInfo._Logout.ret,
+    _func: BoundFunction,
+) -> None:
+    if is_client():
+        return
+    try:
+        del DamageMeterState.player_stats[args.Exiting.PlayerReplicationInfo.PlayerName]
+        DamageMeterState.next_player_nr -= 1
+        DamageMeterState.PRIs.remove(args.Exiting.PlayerReplicationInfo)
+    except KeyError:
+        # logout gets called during login / too early sometimes, so we ignore the error.
+        # maybe a better hook exists to handle this
+        pass
+
+
+## Registering Damage and Distributing Stats
 
 
 @hook("WillowGame.WillowPawn:TookDamageFromEnemy")
@@ -255,13 +317,13 @@ def took_damage_from_enemy(
     if DamageMeterState.is_paused:
         return
 
-    # add tanked damage stats in the future
+    # add tanked damage stats in the future (also prevents counting friendly fire for now)
     if obj.Class.Name == "WillowPlayerPawn":
         return
 
     instigator = args.InstigatedBy
 
-    # discord if enviroment damage or other AI
+    # discard if enviroment damage or other AI
     if instigator is None or instigator.Class.Name != "WillowPlayerController":
         return
     instigator = cast("WillowPlayerController", instigator)
@@ -273,42 +335,40 @@ def took_damage_from_enemy(
     player_name = instigator.PlayerReplicationInfo.PlayerName
     new_stats = DamageMeterState.player_stats
 
-    if player_name not in new_stats:
-        new_stats[player_name] = {
-            "damage": 0,
-            # "tanked_damage": 0,
-            "character_class": CharacterClass(instigator.PlayerClass.CharacterNameId.CharacterName),
-        }
-
-    # maybe a bit hacky, but we want to start the timer on the fist damage instance
-    if DamageMeterState.highest_damage == 1:
-        DamageMeterState.start_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
-
+    if DamageMeterState.highest_damage == 0:
+        DamageMeterState.start_epoch = get_current_epoch()
     # FinalDamage only includes flesh/armor damage
     # Could split this for more detailed stats in the future
     damage_summary = args.Pipeline.DamageSummary
     new_stats[player_name]["damage"] += int(damage_summary.FinalDamage) + int(damage_summary.DamageDealtToShields)
 
 
-# how to check for client from the slide mod by @juso40
-e_net_mode: WorldInfo.ENetMode = cast("WorldInfo.ENetMode", find_enum("ENetMode"))
+def clients_store_stats(stats: dict[str, PlayerStats], is_paused: bool) -> None:
+    for pri in DamageMeterState.PRIs:
+        inner_store_stats(pri, stats, is_paused)
 
 
-def is_client() -> bool:
-    return cast("WillowGameEngine", ENGINE).GetCurrentWorldInfo().NetMode == e_net_mode.NM_Client
-
-
-@broadcast.json_message
-def client_store_stats(stats: dict[str, PlayerStats]) -> None:
-    if not is_client():
-        return
+@targeted.json_message
+def inner_store_stats(stats: dict[str, PlayerStats], is_paused: bool) -> None:
     DamageMeterState.player_stats = stats
+    DamageMeterState.is_paused = is_paused
 
 
-def coroutine_send_stats_every_second() -> PostRenderCoroutine:
+def coroutine_send_stats() -> PostRenderCoroutine:
     while True:
         yield WaitForSeconds(0.5)
-        client_store_stats(DamageMeterState.player_stats)
+        clients_store_stats(DamageMeterState.player_stats, DamageMeterState.is_paused)
+
+
+def coroutine_calc_dps() -> TickCoroutine:
+    while True:
+        yield WaitForSeconds(0.1)
+        if DamageMeterState.is_paused:
+            continue
+        current_epoch = get_current_epoch()
+        for player in DamageMeterState.player_stats:
+            stats = DamageMeterState.player_stats[player]
+            stats["dps"] = stats["damage"] / (current_epoch - DamageMeterState.start_epoch + 1)
 
 
 # endregion
@@ -334,27 +394,26 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
             continue
 
         drawing.reset_state(canvas)
-        drawing.draw_background(drawing.GRAY_COLOR_BG)
+        drawing.draw_background()
 
-        # currently having to make sure the dolumn header and values are aligned.
-        # user should customize columns in the future, fix that then
-        drawing.draw_text_current_line("Name - Class", drawing.GOLD_COLOR)
-        for title, position_from_right in RHS_COLUMNS.items():
-            drawing.draw_text_rhs_column(title, position_from_right, drawing.GOLD_COLOR)
+        class_title_text = " - Class" if opt_show_class.value else ""
+        drawing.draw_text_current_line("Name" + class_title_text, drawing.GOLD_COLOR)
+
+        pos = 0
+        for type, toggld_option in RHS_COLUMNS.items():
+            if toggld_option.value:
+                drawing.draw_text_rhs_column(type.value, pos, drawing.GOLD_COLOR)
+                pos += 1
 
         drawing.new_line()
 
         # sort by damage dealt
-
-        current_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
-        total_damage = max(1, sum(stats["damage"] for stats in current_state.player_stats.values()))
+        total_damage = sum(stats["damage"] for stats in current_state.player_stats.values())
         for player_name, stats in sorted(
             current_state.player_stats.items(), key=lambda x: x[1]["damage"], reverse=True
         ):
             class_attrs = ATTRIBUTES[stats["character_class"]]
-            my_damage = stats["damage"]
-            if my_damage > current_state.highest_damage:
-                current_state.highest_damage = my_damage
+            player_damage = stats["damage"]
 
             # is used for either the bar or text, depending on whether the bars are shown
             variable_color = (
@@ -363,28 +422,32 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
                 # for testing and in case someone is able to play w/ more than 4 players
                 else PLAYER_COLORS[min(len(PLAYER_COLORS) - 1, stats["number"])]
             )
+
             if opt_show_bars.value:
+                if player_damage > current_state.highest_damage:
+                    current_state.highest_damage = player_damage
+                percent = player_damage / current_state.highest_damage if current_state.highest_damage > 0 else 1
                 text_color = drawing.WHITE_COLOR
-                drawing.draw_bar(my_damage / current_state.highest_damage, variable_color)
+                drawing.draw_bar(percent, variable_color)
             else:
                 text_color = variable_color
                 drawing.draw_hline_top(drawing.WHITE_COLOR)
 
-            drawing.draw_text_current_line(
-                player_name + " - " + class_attrs["display_name"],
-                text_color,
-            )
-            drawing.draw_text_rhs_column(f"{my_damage / total_damage:.0%}", RHS_COLUMNS["Party%"], text_color)
-            drawing.draw_text_rhs_column(human_format(my_damage), RHS_COLUMNS["Dmg"], text_color)
-            drawing.draw_text_rhs_column(
-                (
-                    stats["pause_dps"]
-                    if DamageMeterState.is_paused
-                    else human_format(my_damage / (current_epoch - DamageMeterState.start_epoch + 1))
-                ),
-                RHS_COLUMNS["DPS"],
-                text_color,
-            )
+            values: dict[ColumnType, str] = {
+                ColumnType.PARTY_PERCENT: f"{player_damage / total_damage if total_damage > 0 else 1:.0%}",
+                ColumnType.DAMAGE: human_format(player_damage),
+                ColumnType.DPS: human_format(stats["pause_dps"] if DamageMeterState.is_paused else stats["dps"]),
+            }
+
+            class_text = (" - " + class_attrs["display_name"]) if opt_show_class.value else ""
+            drawing.draw_text_current_line(player_name + class_text, text_color)
+
+            pos = 0
+            for type, toggld_option in RHS_COLUMNS.items():
+                if toggld_option.value:
+                    drawing.draw_text_rhs_column(values[type], pos, text_color)
+                    pos += 1
+
             drawing.new_line()
 
 
@@ -393,8 +456,10 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
 
 
 def on_enable():
-    start_coroutine_post_render(coroutine_send_stats_every_second())
     start_coroutine_post_render(coroutine_draw_meter())
+    if not is_client():
+        start_coroutine_post_render(coroutine_send_stats())
+        start_coroutine_tick(coroutine_calc_dps())
 
 
 mod = build_mod(
@@ -402,7 +467,9 @@ mod = build_mod(
         opt_default_active,
         opt_color_by,
         opt_show_bars,
+        opt_show_class,
         drawing.opt_grp_drawing,
+        opt_grp_columns,
     ],
     on_enable=on_enable,
     coop_support=CoopSupport.RequiresAllPlayers,  # not all but atleast host
