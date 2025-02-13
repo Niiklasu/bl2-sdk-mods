@@ -65,6 +65,7 @@ class PlayerStats(TypedDict):
     damage: int
     # tanked_damage: int
     character_class: CharacterClass
+    pause_dps: int
 
 
 class Columns(TypedDict):
@@ -129,7 +130,6 @@ opt_show_bars = options.BoolOption(
 
 
 def reset_damage_meter() -> None:
-    DamageMeterState.start_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
     DamageMeterState.highest_damage = 1
     for player in DamageMeterState.player_stats:
         DamageMeterState.player_stats[player].update(damage=0)
@@ -152,6 +152,13 @@ def reset_meter() -> None:
 def pause_meter() -> None:
     DamageMeterState.is_paused = not DamageMeterState.is_paused
     if DamageMeterState.is_paused:
+        for player in DamageMeterState.player_stats:
+            current_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
+            DamageMeterState.player_stats[player].update(
+                pause_dps=human_format(
+                    DamageMeterState.player_stats[player]["damage"] / (current_epoch - DamageMeterState.start_epoch + 1)
+                )
+            )
         DamageMeterState.pause_start_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
     else:
         DamageMeterState.start_epoch += (
@@ -273,6 +280,10 @@ def took_damage_from_enemy(
             "character_class": CharacterClass(instigator.PlayerClass.CharacterNameId.CharacterName),
         }
 
+    # maybe a bit hacky, but we want to start the timer on the fist damage instance
+    if DamageMeterState.highest_damage == 1:
+        DamageMeterState.start_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
+
     # FinalDamage only includes flesh/armor damage
     # Could split this for more detailed stats in the future
     damage_summary = args.Pipeline.DamageSummary
@@ -334,11 +345,12 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
         drawing.new_line()
 
         # sort by damage dealt
+
+        current_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
         total_damage = max(1, sum(stats["damage"] for stats in current_state.player_stats.values()))
         for player_name, stats in sorted(
             current_state.player_stats.items(), key=lambda x: x[1]["damage"], reverse=True
         ):
-
             class_attrs = ATTRIBUTES[stats["character_class"]]
             my_damage = stats["damage"]
             if my_damage > current_state.highest_damage:
@@ -362,11 +374,16 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
                 player_name + " - " + class_attrs["display_name"],
                 text_color,
             )
-            current_epoch = cast("GameEngine", ENGINE).GetCurrentWorldInfo().TimeSeconds
             drawing.draw_text_rhs_column(f"{my_damage / total_damage:.0%}", RHS_COLUMNS["Party%"], text_color)
             drawing.draw_text_rhs_column(human_format(my_damage), RHS_COLUMNS["Dmg"], text_color)
             drawing.draw_text_rhs_column(
-                human_format(my_damage / (current_epoch - DamageMeterState.start_epoch)), RHS_COLUMNS["DPS"], text_color
+                (
+                    stats["pause_dps"]
+                    if DamageMeterState.is_paused
+                    else human_format(my_damage / (current_epoch - DamageMeterState.start_epoch + 1))
+                ),
+                RHS_COLUMNS["DPS"],
+                text_color,
             )
             drawing.new_line()
 

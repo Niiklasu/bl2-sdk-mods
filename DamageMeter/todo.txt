@@ -2,7 +2,7 @@
 - find hook if player leaves
 - track taken damage
 - (add option) toggle RHS columns (which stats to show)
-
+- (add option) start timer on first damage or when toggled on
 - (add option, maybe) prevent reset on reload
 - (add option, maybe) customize colors
 - (add option, maybe) customize column width
