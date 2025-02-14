@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections import OrderedDict
 
 from coroutines.loop import TickCoroutine, start_coroutine_tick
 
@@ -14,6 +13,7 @@ except (AssertionError, ImportError) as ex:
 
     webbrowser.open("https://bl-sdk.github.io/willow2-mod-db/requirements?mod=DamageMeter")
     raise ex
+from collections import OrderedDict
 from enum import Enum
 from typing import TYPE_CHECKING, TypedDict, cast
 from DamageMeter import drawing
@@ -21,7 +21,7 @@ from coroutines import start_coroutine_post_render, WaitForSeconds, PostRenderCo
 from mods_base import ENGINE, get_pc, hook, build_mod, options
 from mods_base.keybinds import keybind
 from mods_base.mod import CoopSupport, Game
-from networking.decorators import broadcast, targeted
+from networking.decorators import targeted
 from networking.factory import add_network_functions
 from unrealsdk import find_enum
 from unrealsdk.unreal import BoundFunction
