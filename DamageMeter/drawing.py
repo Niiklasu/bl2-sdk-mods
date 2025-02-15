@@ -122,9 +122,9 @@ opt_column_width = options.SliderOption(
 )
 
 opt_grp_drawing = options.NestedOption(
-    identifier="Drawing",
+    identifier="UI Options",
     children=[opt_x_pos, opt_y_pos, opt_bg_opacity, opt_width, opt_line_height, opt_column_width, opt_font],
-    description="Options for the drawing of the damage meter",
+    description="Options for drawing the UI of the damage meter",
 )
 
 
