@@ -230,6 +230,10 @@ def took_damage_from_enemy(
     __ret: WillowPawn._TookDamageFromEnemy.ret,
     __func: WillowPawn._TookDamageFromEnemy,
 ) -> None:
+    # dont think this is needed, but just to be sure
+    if is_client():
+        return
+
     if DamageMeterState.is_paused:
         return
 
@@ -281,7 +285,7 @@ def coroutine_calculate_dps() -> TickCoroutine:
 
 def coroutine_send_stats() -> TickCoroutine:
     while True:
-        yield WaitForSeconds(0.1)  # seems to not impact performance
+        yield WaitForSeconds(1)  # seems to impact performance
         if is_client():
             continue
 
