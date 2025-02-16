@@ -1,6 +1,6 @@
 [project]
 name = "thousand_separator"
-version = "1"
+version = "1.0"
 authors = [{ name = "Niiklasu" }]
 description = """
 Add thousand separators to the numbers in the item cards.
@@ -10,4 +10,4 @@ Add thousand separators to the numbers in the item cards.
 name = "Thousand Separator"
 license = {name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
 download = "https://github.com/Niiklasu/bl2-sdk-mods/raw/refs/heads/main/DamageMeter/DamageMeter.sdkmod"
-version = "1"
+version = "1.0"

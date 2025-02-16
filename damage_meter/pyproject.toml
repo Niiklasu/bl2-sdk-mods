@@ -4,7 +4,7 @@ version = "1.0"
 authors = [{ name = "Niiklasu" }]
 description = """\
 Display the damage done by you and your party members. \n
-Only the host can start/stop/reset the meter, other clients show the values tracked by the host. 
+Only the host can control the meter, other clients show the values tracked by the host. 
 """
 dependencies = [
     "coroutines >= 1.0"

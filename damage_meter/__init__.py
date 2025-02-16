@@ -13,7 +13,7 @@ except (AssertionError, ImportError) as ex:
     raise ex
 from copy import deepcopy
 from typing import TYPE_CHECKING, TypedDict, cast
-from DamageMeter import drawing
+from damage_meter import drawing
 from coroutines import start_coroutine_post_render, WaitForSeconds, PostRenderCoroutine, WaitUntil
 from coroutines.loop import TickCoroutine, start_coroutine_tick
 from mods_base import ENGINE, get_pc, hook, build_mod
@@ -25,7 +25,7 @@ from networking.factory import add_network_functions
 from unrealsdk import find_enum
 from unrealsdk.hooks import Type
 from ui_utils.hud_message import show_hud_message
-from DamageMeter.ui_options import (
+from damage_meter.ui_options import (
     opt_grp_drawing,
     opt_show_example_ui,
     opt_color_by,
@@ -268,6 +268,8 @@ def took_damage_from_enemy(
 def coroutine_calculate_dps() -> TickCoroutine:
     while True:
         yield WaitForSeconds(0.1)
+        if not mod.is_enabled:
+            return
         if is_client():
             continue
 
@@ -286,6 +288,8 @@ def coroutine_calculate_dps() -> TickCoroutine:
 def coroutine_send_stats() -> TickCoroutine:
     while True:
         yield WaitForSeconds(1)  # seems to impact performance
+        if not mod.is_enabled:
+            return
         if is_client():
             continue
 
@@ -385,6 +389,8 @@ def draw_meter(canvas: Canvas, player_stats: dict[str, PlayerStats]) -> None:
 def coroutine_draw_meter() -> PostRenderCoroutine:
     while True:
         yield WaitUntil(lambda: get_pc().GetHUDMovie() is not None)
+        if not mod.is_enabled:
+            return
         canvas = yield
         if DamageMeterState.is_hidden or opt_show_example_ui.value:
             continue

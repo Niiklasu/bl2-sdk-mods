@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from unrealsdk import find_object, make_struct
-from DamageMeter.ui_options import (
+from damage_meter.ui_options import (
     FONTS,
     opt_bg_opacity,
     opt_column_width,

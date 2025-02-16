@@ -1,7 +1,5 @@
-- show meter in (drawing) settings 
-
-- (add option, maybe) prevent reset on reload
-- (add option, maybe) customize colors
-
+- allow enabling in game
 - track taken damage
 - REFACTOR: better hook and let clients compute separately (maybe from display dmg number)
+- (add option, maybe) prevent reset on reload
+- (add option, maybe) customize colors
