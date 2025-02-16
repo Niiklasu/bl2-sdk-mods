@@ -1,11 +1,19 @@
 from __future__ import annotations
-from types import EllipsisType
-from typing import TYPE_CHECKING, Any, TypedDict, cast
-from mods_base import options
+from typing import TYPE_CHECKING
 from unrealsdk import find_object, make_struct
+from DamageMeter.ui_options import (
+    FONTS,
+    opt_bg_opacity,
+    opt_column_width,
+    opt_font,
+    opt_line_height,
+    opt_width,
+    opt_x_pos,
+    opt_y_pos,
+)
 
 if TYPE_CHECKING:
-    from bl2 import Canvas, Object, Font
+    from bl2 import Canvas, Object
 
     # might be a bit too much boilerplate
     make_struct_color = Object.Color.make_struct
@@ -44,15 +52,6 @@ GLOW_OUTER: Object.Vector2D = make_struct_vector_2d("Vector2D", X=0, Y=0)
 GLOW_INNER: Object.Vector2D = make_struct_vector_2d("Vector2D", X=0, Y=0)
 
 
-# got these from yets actionSkillCountdown mod
-FONTS: dict[str, Font] = {
-    # "willowhead": cast("Font", find_object("Font", "UI_Fonts.Font_Willowhead_8pt")),
-    "willowbody": cast("Font", find_object("Font", "ui_fonts.font_willowbody_18pt")),
-    "hudmedium": cast("Font", find_object("Font", "UI_Fonts.Font_Hud_Medium")),
-    "smallfont": cast("Font", find_object("Font", "EngineFonts.SmallFont")),
-    "tinyfont": cast("Font", find_object("Font", "EngineFonts.TinyFont")),
-}
-
 GLOW_INFO = make_struct_glow_info(
     "DepthFieldGlowInfo",
     bEnableGlow=True,
@@ -62,74 +61,6 @@ GLOW_INFO = make_struct_glow_info(
 )
 FONT_RENDER_INFO = make_struct_font_render_info(
     "FontRenderInfo", bClipText=True, bEnableShadow=True, GlowInfo=GLOW_INFO
-)
-
-# ugly for now
-DEFAULT_OPT_VALUES = {
-    "Background Opacity": 150,
-    "X Position": 35,
-    "Y Position": 350,
-    "Line Height": 35,
-    "Meter Width": 425,
-    "Text Font": "hudmedium",
-    "Column Width": 70,
-}
-# endregion
-# region Options
-
-opt_bg_opacity = options.SliderOption(
-    identifier="Background Opacity",
-    value=DEFAULT_OPT_VALUES["Background Opacity"],
-    min_value=0,
-    max_value=255,
-    description=f"The opacity of the background. Default value is {DEFAULT_OPT_VALUES['Background Opacity']}",
-)
-
-opt_x_pos = options.SliderOption(
-    identifier="X Position",
-    value=DEFAULT_OPT_VALUES["X Position"],
-    min_value=0,
-    max_value=1720,
-    description=f"The x position of the damage meter. Default value is {DEFAULT_OPT_VALUES['X Position']}",
-)
-
-opt_y_pos = options.SliderOption(
-    identifier="Y Position",
-    value=DEFAULT_OPT_VALUES["Y Position"],
-    min_value=0,
-    max_value=1040,
-    description=f"The y position of the damage meter. Default value is {DEFAULT_OPT_VALUES['Y Position']}",
-)
-
-opt_line_height = options.SliderOption(
-    identifier="Line Height",
-    value=DEFAULT_OPT_VALUES["Line Height"],
-    min_value=10,
-    max_value=200,
-    description=f"The height of each line. Default value is {DEFAULT_OPT_VALUES['Line Height']}",
-)
-
-opt_width = options.SliderOption(
-    identifier="Meter Width",
-    value=DEFAULT_OPT_VALUES["Meter Width"],
-    min_value=200,
-    max_value=1000,
-    description=f"The width of the damage meter. Default value is {DEFAULT_OPT_VALUES['Meter Width']}",
-)
-
-opt_font = options.DropdownOption(
-    identifier="Text Font",
-    value=DEFAULT_OPT_VALUES["Text Font"],
-    choices=list(FONTS.keys()),
-    description=f"The font to use for the damage meter. Default value is {DEFAULT_OPT_VALUES['Text Font']}",
-)
-
-opt_column_width = options.SliderOption(
-    identifier="Column Width",
-    value=DEFAULT_OPT_VALUES["Column Width"],
-    min_value=10,
-    max_value=200,
-    description=f"The width of each column in the damage meter. Default value is {DEFAULT_OPT_VALUES['Column Width']}",
 )
 
 

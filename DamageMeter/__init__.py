@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from coroutines.loop import TickCoroutine, start_coroutine_tick
-
 try:
     assert __import__("coroutines").__version_info__ >= (1, 0), "This mod requires coroutines version 1.0 or higher"
     assert __import__("mods_base").__version_info__ >= (1, 8), "Please update the SDK"
@@ -13,12 +11,13 @@ except (AssertionError, ImportError) as ex:
 
     webbrowser.open("https://bl-sdk.github.io/willow2-mod-db/requirements?mod=DamageMeter")
     raise ex
-from collections import OrderedDict
-from enum import Enum
+from copy import deepcopy
 from typing import TYPE_CHECKING, TypedDict, cast
 from DamageMeter import drawing
 from coroutines import start_coroutine_post_render, WaitForSeconds, PostRenderCoroutine, WaitUntil
-from mods_base import ENGINE, get_pc, hook, build_mod, options
+from coroutines.loop import TickCoroutine, start_coroutine_tick
+from mods_base import ENGINE, get_pc, hook, build_mod
+from mods_base import options
 from mods_base.keybinds import keybind
 from mods_base.mod import CoopSupport, Game
 from networking.decorators import targeted
@@ -26,6 +25,16 @@ from networking.factory import add_network_functions
 from unrealsdk import find_enum
 from unrealsdk.hooks import Type
 from ui_utils.hud_message import show_hud_message
+from DamageMeter.ui_options import (
+    opt_grp_drawing,
+    opt_show_example_ui,
+    opt_color_by,
+    opt_show_bars,
+    opt_show_class,
+    ColumnType,
+    ColorBy,
+    RHS_COLUMNS,
+)
 
 if TYPE_CHECKING:
     from bl2 import (
@@ -40,18 +49,7 @@ if TYPE_CHECKING:
     )
 
 
-# region Enums, Types and Constants
-
-
-class ColumnType(str, Enum):
-    PARTY_PERCENT = "Party%"
-    DAMAGE = "Dmg"
-    DPS = "DPS"
-
-
-class ColorBy(str, Enum):
-    PLAYER = "Player"
-    CLASS = "Class"
+# region Types and Constants
 
 
 class CharacterAttributes(TypedDict):
@@ -77,8 +75,8 @@ ATTRIBUTES: dict[str, CharacterAttributes] = {
 }
 
 PLAYER_COLORS = [
-    drawing.AXTON_GREEN_COLOR,
     drawing.ZERO_CYAN_COLOR,
+    drawing.AXTON_GREEN_COLOR,
     drawing.GAIGE_PURPLE_COLOR,
     drawing.KRIEG_RED_COLOR,
     drawing.MAYA_YELLOW_COLOR,
@@ -86,19 +84,6 @@ PLAYER_COLORS = [
 ]
 
 TITLE = "Damage Meter"
-
-# super ugly for now, might update one day
-DEFAULT_OPT_VALUES = {
-    "Active by Default": False,
-    "Show Example UI": False,
-    "Colored By": ColorBy.CLASS,
-    "Show Bars": True,
-    "Show Class": True,
-    "Show DPS": True,
-    "Show Total Damage": True,
-    "Show Party Percentage": True,
-}
-DEFAULT_OPT_VALUES.update(drawing.DEFAULT_OPT_VALUES)
 
 # endregion
 # region Options
@@ -112,114 +97,17 @@ def on_default_active_change(_, value: bool) -> None:
 
 opt_default_active = options.BoolOption(
     identifier="Active by Default",
-    value=DEFAULT_OPT_VALUES["Active by Default"],
+    value=False,
     description="Whether the mod should be active by default",
     on_change=on_default_active_change,
 )
 
-opt_show_example_ui = options.BoolOption(
-    identifier="Show Example UI",
-    value=DEFAULT_OPT_VALUES["Show Example UI"],
-    description="Show an example meter. More than 4 players to show you the different options. IMPORTANT: Toggle off when you're done.",
+opt_include_overkill_damage = options.BoolOption(
+    identifier="Include Overkill Damage",
+    value=True,
+    description="Whether to include overkill damage in the damage meter. E.g. killing an enemy with 100 health with a 200 damage shot would add 200 damage to the meter.",
 )
 
-opt_color_by = options.SpinnerOption(
-    identifier="Colored By",
-    value=DEFAULT_OPT_VALUES["Colored By"],
-    choices=[cb.value for cb in ColorBy],
-    description="CLASS means multiple players with the same class get the same color, PLAYER means each player gets a unique color",
-    wrap_enabled=True,
-)
-
-opt_show_bars = options.BoolOption(
-    identifier="Show Bars",
-    value=DEFAULT_OPT_VALUES["Show Bars"],
-    description="Whether to show bars for the damage or just the text",
-)
-
-opt_show_class = options.BoolOption(
-    identifier="Show Class",
-    value=DEFAULT_OPT_VALUES["Show Class"],
-    description="Whether to show the class of the player or not",
-)
-
-
-def toggle_columns(type: ColumnType, value: bool) -> None:
-    RHS_COLUMNS[type] = value
-
-
-opt_show_dps = options.BoolOption(
-    identifier="Show DPS",
-    value=DEFAULT_OPT_VALUES["Show DPS"],
-    description="Whether to show the DPS column or not",
-)
-
-opt_show_total_dmg = options.BoolOption(
-    identifier="Show Total Damage",
-    value=DEFAULT_OPT_VALUES["Show Total Damage"],
-    description="Whether to show the total damage column or not",
-)
-
-opt_show_party_percent = options.BoolOption(
-    identifier="Show Party Percentage",
-    value=DEFAULT_OPT_VALUES["Show Party Percentage"],
-    description="Whether to show the party percentage column or not",
-)
-
-
-RHS_COLUMNS: dict[ColumnType, options.BoolOption] = OrderedDict(
-    [
-        (ColumnType.PARTY_PERCENT, opt_show_party_percent),
-        (ColumnType.DAMAGE, opt_show_total_dmg),
-        (ColumnType.DPS, opt_show_dps),
-    ]
-)
-
-opt_grp_columns = options.GroupedOption(
-    identifier="Columns",
-    children=[opt_show_dps, opt_show_total_dmg, opt_show_party_percent],
-    description="Which columns to show in the damage meter",
-)
-
-opt_grp_drawing = options.NestedOption(
-    identifier="UI Options",
-    children=[
-        opt_show_example_ui,
-        opt_color_by,
-        # opt_show_bars,
-        opt_show_class,
-        drawing.opt_x_pos,
-        drawing.opt_y_pos,
-        drawing.opt_bg_opacity,
-        drawing.opt_width,
-        drawing.opt_line_height,
-        drawing.opt_column_width,
-        # drawing.opt_font,
-        opt_grp_columns,
-    ],
-    description="Options for drawing the UI of the damage meter",
-)
-
-
-def reset_ui_options(_) -> None:
-    reset_options(opt_grp_drawing.children)
-
-
-def reset_options(opts: list[options.BaseOption]) -> None:
-    for option in opts:
-        if isinstance(option, options.ValueOption):
-            option.value = DEFAULT_OPT_VALUES[option.identifier]
-        elif isinstance(option, options.GroupedOption) or isinstance(option, options.NestedOption):
-            reset_options(option.children)
-
-
-opt_reset_ui = options.ButtonOption(
-    identifier="Reset UI",
-    description="Reset the UI to the default position. IMPORTANT: Leave the UI Options menu and re-enter to see the changes on the sliders.",
-    on_press=reset_ui_options,
-)
-
-opt_grp_drawing.children.append(opt_reset_ui)
 
 # endregion
 # region Keybinds
@@ -272,7 +160,7 @@ def pause_meter() -> None:
 
 
 # endregion
-# region Calculate and Send Stats
+# region Manage Players, Calculate and Send Stats
 
 
 ## State
@@ -356,7 +244,7 @@ def took_damage_from_enemy(
         return
     instigator = cast("WillowPlayerController", instigator)
 
-    # wait with dps calculation until first damage
+    # a bit hacky, but wait with dps calculation until first damage
     if max(stats["damage"] for stats in DamageMeterState.player_stats.values()) == 0:
         for player in DamageMeterState.player_stats:
             DamageMeterState.player_stats[player]["start_epoch"] = get_current_epoch()
@@ -364,37 +252,56 @@ def took_damage_from_enemy(
     # FinalDamage only includes flesh/armor damage
     # Could split this for more detailed stats in the future
     damage_summary = args.Pipeline.DamageSummary
-    DamageMeterState.player_stats[instigator.PlayerReplicationInfo.PlayerName]["damage"] += int(
-        damage_summary.FinalDamage + damage_summary.DamageDealtToShields
-    )
+    damage = damage_summary.FinalDamage + damage_summary.DamageDealtToShields
+
+    if not opt_include_overkill_damage.value:
+        if damage > damage_summary.PreviousHealth:
+            damage = damage_summary.PreviousHealth
+    DamageMeterState.player_stats[instigator.PlayerReplicationInfo.PlayerName]["damage"] += int(damage)
 
 
-## send stats to clients
-def coroutine_send_stats() -> TickCoroutine:
+## track dps independently of damage dealt
+def coroutine_calculate_dps() -> TickCoroutine:
     while True:
-        yield WaitForSeconds(0.25)
+        yield WaitForSeconds(0.1)
         if is_client():
             continue
 
-        # create a copy for the rare case that the dict canges size during iteration
-        current_stats = DamageMeterState.player_stats.copy()
+        # deepcopy to prevent error if player disconnects during iteration
+        current_stats = deepcopy(DamageMeterState.player_stats)
         current_epoch = get_current_epoch()
-
-        for player, stats in current_stats.items():
-
-            # remove disconnected players
-            player_pri = next((pri for pri in get_pc_cast().WorldInfo.GRI.PRIArray if pri.PlayerName == player), None)
-            if player_pri == None:
-                del current_stats[player]
-                continue
-
+        for player_name, stats in current_stats.items():
             if not DamageMeterState.is_paused:
                 stats["dps"] = max(stats["damage"] / (current_epoch - stats["start_epoch"] + 1), 0)
+        DamageMeterState.player_stats = current_stats
 
-            # send stats only to clients
-            if player_pri == get_pc_cast().PlayerReplicationInfo:
+
+## send stats to clients
+
+
+def coroutine_send_stats() -> TickCoroutine:
+    while True:
+        yield WaitForSeconds(0.1)  # seems to not impact performance
+        if is_client():
+            continue
+
+        pc = get_pc_cast()
+        disconnected_players = []
+        for player_name, stats in DamageMeterState.player_stats.items():
+
+            # mark disconnected players
+            pri = next((pri for pri in pc.WorldInfo.GRI.PRIArray if pri.PlayerName == player_name), None)
+            if pri is None:
+                disconnected_players.append(player_name)
                 continue
-            send_stats_single_target(player_pri, current_stats)
+
+            # send stats to clients
+            if pri != pc.PlayerReplicationInfo:
+                send_stats_single_target(pri, DamageMeterState.player_stats)
+
+        # remove disconnected players
+        for player in disconnected_players:
+            del DamageMeterState.player_stats[player]
 
 
 @targeted.json_message
@@ -514,12 +421,14 @@ def draw_example_ui(
 def on_enable():
     start_coroutine_post_render(coroutine_draw_meter())
     start_coroutine_tick(coroutine_send_stats())
+    start_coroutine_tick(coroutine_calculate_dps())
     opt_show_example_ui.value = False
 
 
 mod = build_mod(
     options=[
         opt_default_active,
+        opt_include_overkill_damage,
         opt_grp_drawing,
     ],
     on_enable=on_enable,
