@@ -1,5 +1,5 @@
 [project]
-name = "DamageMeter"
+name = "damage_meter"
 version = "1.0"
 authors = [{ name = "Niiklasu" }]
 description = """\

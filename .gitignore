@@ -6,8 +6,8 @@
 !.gitattributes
 
 
-!DamageMeter/**
-!ThousandSeparator/**
+!damage_meter/**
+!thousand_separator/**
 
 
 ## Python stuff

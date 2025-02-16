@@ -1,5 +1,5 @@
 [project]
-name = "ThousandSeparator"
+name = "thousand_separator"
 version = "1"
 authors = [{ name = "Niiklasu" }]
 description = """
