@@ -36,6 +36,7 @@ GRAY_COLOR_BG: Object.Color = make_struct_color("Color", R=125, G=125, B=125, A=
 BLACK_COLOR: Object.Color = make_struct_color("Color", R=0, G=0, B=0, A=255)
 WHITE_COLOR: Object.Color = make_struct_color("Color", R=255, G=255, B=255, A=255)
 GOLD_COLOR: Object.Color = make_struct_color("Color", R=255, G=165, B=0, A=255)
+RED_COLOR: Object.Color = make_struct_color("Color", R=255, G=0, B=0, A=255)
 
 # some stuff that DrawText needs for the out variable so we fill with dummy values
 GLOW: Object.LinearColor = make_struct_linear_color("LinearColor", R=0, G=0, B=0, A=255)
@@ -63,68 +64,72 @@ FONT_RENDER_INFO = make_struct_font_render_info(
     "FontRenderInfo", bClipText=True, bEnableShadow=True, GlowInfo=GLOW_INFO
 )
 
+# ugly for now
+DEFAULT_OPT_VALUES = {
+    "Background Opacity": 150,
+    "X Position": 35,
+    "Y Position": 350,
+    "Line Height": 35,
+    "Meter Width": 425,
+    "Text Font": "hudmedium",
+    "Column Width": 70,
+}
 # endregion
 # region Options
 
 opt_bg_opacity = options.SliderOption(
     identifier="Background Opacity",
-    value=150,
+    value=DEFAULT_OPT_VALUES["Background Opacity"],
     min_value=0,
     max_value=255,
-    description="The opacity of the background. Default value is 150",
+    description=f"The opacity of the background. Default value is {DEFAULT_OPT_VALUES['Background Opacity']}",
 )
 
 opt_x_pos = options.SliderOption(
     identifier="X Position",
-    value=35,
+    value=DEFAULT_OPT_VALUES["X Position"],
     min_value=0,
     max_value=1720,
-    description="The x position of the damage meter. Default value is 35",
+    description=f"The x position of the damage meter. Default value is {DEFAULT_OPT_VALUES['X Position']}",
 )
 
 opt_y_pos = options.SliderOption(
     identifier="Y Position",
-    value=350,
+    value=DEFAULT_OPT_VALUES["Y Position"],
     min_value=0,
     max_value=1040,
-    description="The y position of the damage meter. Default value is 350",
+    description=f"The y position of the damage meter. Default value is {DEFAULT_OPT_VALUES['Y Position']}",
 )
 
 opt_line_height = options.SliderOption(
     identifier="Line Height",
-    value=40,
+    value=DEFAULT_OPT_VALUES["Line Height"],
     min_value=10,
     max_value=200,
-    description="The height of each line. Default value is 40",
+    description=f"The height of each line. Default value is {DEFAULT_OPT_VALUES['Line Height']}",
 )
 
 opt_width = options.SliderOption(
     identifier="Meter Width",
-    value=426,
+    value=DEFAULT_OPT_VALUES["Meter Width"],
     min_value=200,
     max_value=1000,
-    description="The width of the damage meter. Default value is 425",
+    description=f"The width of the damage meter. Default value is {DEFAULT_OPT_VALUES['Meter Width']}",
 )
 
 opt_font = options.DropdownOption(
     identifier="Text Font",
-    value="hudmedium",
+    value=DEFAULT_OPT_VALUES["Text Font"],
     choices=list(FONTS.keys()),
-    description="The font to use for the damage meter",
+    description=f"The font to use for the damage meter. Default value is {DEFAULT_OPT_VALUES['Text Font']}",
 )
 
 opt_column_width = options.SliderOption(
     identifier="Column Width",
-    value=70,
+    value=DEFAULT_OPT_VALUES["Column Width"],
     min_value=10,
     max_value=200,
-    description="The width of each column in the damage meter. Default value is 70",
-)
-
-opt_grp_drawing = options.NestedOption(
-    identifier="UI Options",
-    children=[opt_x_pos, opt_y_pos, opt_bg_opacity, opt_width, opt_line_height, opt_column_width, opt_font],
-    description="Options for drawing the UI of the damage meter",
+    description=f"The width of each column in the damage meter. Default value is {DEFAULT_OPT_VALUES['Column Width']}",
 )
 
 
