@@ -108,7 +108,23 @@ opt_include_overkill_damage = options.BoolOption(
     description="Whether to include overkill damage in the damage meter. E.g. killing an enemy with 100 health with a 200 damage shot would add 200 damage to the meter.",
 )
 
+opt_dps_update_interval = options.SliderOption(
+    identifier="DPS Updates Interval in ms",
+    value=500,
+    min_value=100,
+    max_value=5000,
+    step=100,
+    description="How often the DPS should be updated. Default is 500ms = 0.5 seconds.",
+)
 
+opt_share_per_five = options.SliderOption(
+    identifier="Share Data Interval in ms",
+    value=1000,
+    min_value=100,
+    max_value=5000,
+    step=100,
+    description="How often the data should be shared with clients. Lower values can lead to performance problems for the other clients. Default is 1000 ms = 1 second.",
+)
 # endregion
 # region Keybinds
 
@@ -131,7 +147,7 @@ def reset_meter() -> None:
     if is_client():
         return
     reset_damage_meter()
-    show_hud_message(TITLE, "Stats resetted")
+    show_hud_message(TITLE, "Stats reset")
 
 
 @keybind("(Un)Pause Meter", key="P")
@@ -267,7 +283,7 @@ def took_damage_from_enemy(
 ## track dps independently of damage dealt
 def coroutine_calculate_dps() -> TickCoroutine:
     while True:
-        yield WaitForSeconds(0.1)
+        yield WaitForSeconds(opt_dps_update_interval.value / 1000)
         if not mod.is_enabled:
             return
         if is_client():
@@ -287,7 +303,7 @@ def coroutine_calculate_dps() -> TickCoroutine:
 
 def coroutine_send_stats() -> TickCoroutine:
     while True:
-        yield WaitForSeconds(1)  # seems to impact performance
+        yield WaitForSeconds(opt_share_per_five.value / 1000)
         if not mod.is_enabled:
             return
         if is_client():
@@ -439,6 +455,8 @@ mod = build_mod(
     options=[
         opt_default_active,
         opt_include_overkill_damage,
+        opt_dps_update_interval,
+        opt_share_per_five,
         opt_grp_drawing,
     ],
     on_enable=on_enable,
