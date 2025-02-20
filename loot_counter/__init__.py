@@ -5,27 +5,35 @@ import enum
 from types import ModuleType
 from typing import TYPE_CHECKING, Callable, Optional, TypedDict, cast
 from coroutines.loop import PostRenderCoroutine, WaitUntil, start_coroutine_post_render
-from legacy_compat import legacy_compat
 from mods_base import get_pc, options
 from mods_base.keybinds import keybind
 from mods_base.mod_factory import build_mod
 from mods_base.settings import SETTINGS_DIR
 from mods_base.hook import hook, Type
+from legacy_compat import legacy_compat
 
 Quickload = Optional[ModuleType]
-with legacy_compat():
-    try:
-        import Quickload
-    except ImportError:
-        Quickload = None
+
 
 if TYPE_CHECKING:
     from bl2 import WillowPickup, WillowItem, WillowInventory, WillowPawn, WillowGameViewportClient
     from ui import drawing
     from ui.options import opt_show_example_ui, BaseOptions
+
+    with legacy_compat():
+        try:
+            import Quickload
+        except ImportError:
+            Quickload = None
 else:
     from .ui import drawing
     from .ui.options import opt_show_example_ui, BaseOptions
+
+    with legacy_compat():
+        try:
+            from Mods import Quickload
+        except ImportError:
+            Quickload = None
 
 
 class RunData(TypedDict):
