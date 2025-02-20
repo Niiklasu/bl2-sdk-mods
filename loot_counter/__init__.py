@@ -13,7 +13,6 @@ from mods_base.keybinds import keybind
 from mods_base.settings import SETTINGS_DIR
 from mods_base.hook import hook
 from mods_base.mod_factory import build_mod
-from .ui import drawing
 
 Quickload = Optional[ModuleType]
 with legacy_compat():
@@ -24,6 +23,9 @@ with legacy_compat():
 
 if TYPE_CHECKING:
     from bl2 import WillowPickup, WillowItem, WillowInventory, WillowPawn, TextChatGFxMovie, WillowPlayerController
+    from ui import drawing
+else:
+    from .ui import drawing
 
 
 class RunData(TypedDict):

@@ -1,7 +1,12 @@
 from collections import OrderedDict
 from enum import Enum
+from typing import TYPE_CHECKING
 from mods_base import options
-from .ui.options import BaseOptions
+
+if TYPE_CHECKING:
+    from ui.options import BaseOptions
+else:
+    from .ui.options import BaseOptions
 
 
 class ColumnType(str, Enum):

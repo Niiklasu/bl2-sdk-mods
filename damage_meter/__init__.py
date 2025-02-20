@@ -38,8 +38,6 @@ from .meter_options import (
     opt_show_bars,
     opt_show_class,
 )
-from .ui import drawing
-from .ui.options import opt_show_example_ui
 
 if TYPE_CHECKING:
     from bl2 import (
@@ -52,6 +50,11 @@ if TYPE_CHECKING:
         WillowPlayerController,
         WorldInfo,
     )
+    from ui import drawing
+    from ui.options import opt_show_example_ui
+else:
+    from .ui import drawing
+    from .ui.options import opt_show_example_ui
 
 
 # region Types and Constants
