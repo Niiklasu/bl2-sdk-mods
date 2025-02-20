@@ -8,6 +8,8 @@
 
 !damage_meter/**
 !thousand_separator/**
+!loot_counter/**
+!ui/**
 
 
 ## Python stuff

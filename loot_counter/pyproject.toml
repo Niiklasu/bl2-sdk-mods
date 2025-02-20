@@ -1,0 +1,13 @@
+[project]
+name = "loot_counter"
+version = "1.0"
+authors = [{ name = "Niiklasu" }]
+description = """
+Count Loot
+"""
+
+[tool.sdkmod]
+name = "Loot Counter"
+license = {name = "GPL3", url = "https://choosealicense.com/licenses/gpl-3.0/" }
+download = "https://github.com/Niiklasu/bl2-sdk-mods/raw/refs/heads/main/DamageMeter/DamageMeter.sdkmod"
+version = "1.0"

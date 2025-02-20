@@ -13,39 +13,44 @@ except (AssertionError, ImportError) as ex:
     raise ex
 from copy import deepcopy
 from typing import TYPE_CHECKING, TypedDict, cast
-from damage_meter import drawing
-from coroutines import start_coroutine_post_render, WaitForSeconds, PostRenderCoroutine, WaitUntil
+from unrealsdk import find_enum
+from unrealsdk.hooks import Type
 from coroutines.loop import TickCoroutine, start_coroutine_tick
-from mods_base import ENGINE, get_pc, hook, build_mod
-from mods_base import options
+from coroutines import (
+    PostRenderCoroutine,
+    WaitForSeconds,
+    WaitUntil,
+    start_coroutine_post_render,
+)
+from mods_base import ENGINE, build_mod, get_pc, hook, options
 from mods_base.keybinds import keybind
 from mods_base.mod import CoopSupport, Game
 from networking.decorators import targeted
 from networking.factory import add_network_functions
-from unrealsdk import find_enum
-from unrealsdk.hooks import Type
 from ui_utils.hud_message import show_hud_message
-from damage_meter.ui_options import (
-    opt_grp_drawing,
-    opt_show_example_ui,
+from .meter_options import (
+    MeterOptions,
+    RHS_COLUMNS,
+    ColorBy,
+    ColumnType,
+    opt_grp_columns,
     opt_color_by,
     opt_show_bars,
     opt_show_class,
-    ColumnType,
-    ColorBy,
-    RHS_COLUMNS,
 )
+from .ui import drawing
+from .ui.options import opt_show_example_ui
 
 if TYPE_CHECKING:
     from bl2 import (
-        WillowGameViewportClient,
-        WillowPlayerController,
-        Object,
-        GameEngine,
-        WillowPawn,
-        WorldInfo,
-        WillowGameEngine,
         Canvas,
+        GameEngine,
+        Object,
+        WillowGameEngine,
+        WillowGameViewportClient,
+        WillowPawn,
+        WillowPlayerController,
+        WorldInfo,
     )
 
 
@@ -347,20 +352,23 @@ def human_format(num: float) -> str:
     return "{}{}".format("{:f}".format(num).rstrip("0").rstrip("."), ["", "K", "M", "B", "T", "Q", "E"][magnitude])
 
 
+canv = drawing.Drawing(options=MeterOptions, hidden_options=[MeterOptions.FONT, MeterOptions.SHOW_BARS])
+
+
 def draw_meter(canvas: Canvas, player_stats: dict[str, PlayerStats]) -> None:
-    drawing.reset_state(canvas)
-    drawing.draw_background()
+    canv.reset_state(canvas)
+    canv.draw_background()
 
     class_title_text = " - Class" if opt_show_class.value else ""
-    drawing.draw_text_current_line("Name" + class_title_text, drawing.GOLD_COLOR)
+    canv.draw_text_current_line("Name" + class_title_text, drawing.GOLD_COLOR)
 
     pos = 0
     for type, toggled_option in RHS_COLUMNS.items():
         if toggled_option.value:
-            drawing.draw_text_rhs_column(type.value, pos, drawing.GOLD_COLOR)
+            canv.draw_text_rhs_column(type.value, pos, drawing.GOLD_COLOR)
             pos += 1
 
-    drawing.new_line()
+    canv.new_line()
 
     # sort by damage dealt
 
@@ -378,10 +386,10 @@ def draw_meter(canvas: Canvas, player_stats: dict[str, PlayerStats]) -> None:
             highest_damage = max(stats["damage"] for stats in player_stats.values())
             percent = player_damage / highest_damage if highest_damage > 0 else 1
             text_color = drawing.WHITE_COLOR
-            drawing.draw_bar(percent, variable_color)
+            canv.draw_bar(percent, variable_color)
         else:
             text_color = variable_color
-            drawing.draw_hline_top(drawing.WHITE_COLOR)
+            canv.draw_hline_top(drawing.WHITE_COLOR)
 
         values: dict[ColumnType, str] = {
             ColumnType.PARTY_PERCENT: f"{player_damage / total_damage if total_damage > 0 else 1:.0%}",
@@ -390,15 +398,15 @@ def draw_meter(canvas: Canvas, player_stats: dict[str, PlayerStats]) -> None:
         }
 
         class_text = (" - " + class_attrs["display_name"]) if opt_show_class.value else ""
-        drawing.draw_text_current_line(player_name + class_text, text_color)
+        canv.draw_text_current_line(player_name + class_text, text_color)
 
         pos = 0
         for type, toggled_option in RHS_COLUMNS.items():
             if toggled_option.value:
-                drawing.draw_text_rhs_column(values[type], pos, text_color)
+                canv.draw_text_rhs_column(values[type], pos, text_color)
                 pos += 1
 
-        drawing.new_line()
+        canv.new_line()
 
 
 ## draw meter in game
@@ -445,6 +453,7 @@ def draw_example_ui(
 
 
 def on_enable():
+
     start_coroutine_post_render(coroutine_draw_meter())
     start_coroutine_tick(coroutine_send_stats())
     start_coroutine_tick(coroutine_calculate_dps())
@@ -457,7 +466,7 @@ mod = build_mod(
         opt_include_overkill_damage,
         opt_dps_update_interval,
         opt_share_per_five,
-        opt_grp_drawing,
+        canv.opt_group,
     ],
     on_enable=on_enable,
     coop_support=CoopSupport.RequiresAllPlayers,  # not all but atleast host
