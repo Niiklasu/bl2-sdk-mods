@@ -125,6 +125,7 @@ def _create_farm(name: str) -> None:
 
 
 def _manage_load_run(caller: OptionBox, opt_button: OptionBoxButton) -> None:
+    save_farm(CounterState.current_farm)
     load_farm(opt_button.name)
     save_session_info()
 

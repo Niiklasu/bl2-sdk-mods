@@ -276,4 +276,5 @@ from loot_counter.option_box.boxes import opt_box
 mod = build_mod(
     on_enable=on_enable,
     on_disable=on_disable,
+    options=[opt_enabled_by_default, canv.opt_group],
 )
