@@ -1,6 +1,5 @@
 from __future__ import annotations
 import json
-import sys
 import pathlib
 import enum
 from types import ModuleType
@@ -11,7 +10,7 @@ from mods_base import get_pc, options
 from mods_base.keybinds import keybind
 from mods_base.mod_factory import build_mod
 from mods_base.settings import SETTINGS_DIR
-from mods_base.hook import hook
+from mods_base.hook import hook, Type
 
 Quickload = Optional[ModuleType]
 with legacy_compat():
@@ -21,10 +20,12 @@ with legacy_compat():
         Quickload = None
 
 if TYPE_CHECKING:
-    from bl2 import WillowPickup, WillowItem, WillowInventory, WillowPawn, PauseGFxMovie
+    from bl2 import WillowPickup, WillowItem, WillowInventory, WillowPawn, WillowGameViewportClient
     from ui import drawing
+    from ui.options import opt_show_example_ui, BaseOptions
 else:
     from .ui import drawing
+    from .ui.options import opt_show_example_ui, BaseOptions
 
 
 class RunData(TypedDict):
@@ -57,10 +58,17 @@ LAST_SESSION_FILE: str = r"last_session.txt"
 
 # Options and keybinds
 
+
+def on_default_active_change(_, value: bool) -> None:
+    if value and not CounterState.is_enabled:
+        CounterState.is_enabled = True
+
+
 opt_enabled_by_default = options.BoolOption(
     identifier="Enabled by default",
-    value=True,
+    value=False,
     description="Whether the loot counter should be enabled by default",
+    on_change=on_default_active_change,
 )
 
 
@@ -163,7 +171,32 @@ def on_toss_inventory(
 # Drawing
 
 
-canv = drawing.Drawing()
+BaseOptions.set_default(BaseOptions.WIDTH, 250)
+canv = drawing.Drawing(hidden_options=[BaseOptions.RHS_COLUMN_WIDTH])
+
+
+def draw_tracker(canvas: drawing.Canvas, name: str, data: RunData) -> None:
+    canv.reset_state(canvas)
+    canv.draw_background()
+    canv.reset_state(canvas)
+    canv.draw_background()
+    canv.draw_text_current_line("Farming: " + name, drawing.WHITE_COLOR)
+    canv.new_line()
+    canv.draw_text_current_line("Runs: " + str(data["runs"]), drawing.WHITE_COLOR)
+    canv.new_line()
+    canv.draw_hline_top(color=drawing.WHITE_COLOR)
+
+    if data["show_rarity"]:
+        for rarity, value in data["tracked_rarities"].items():
+            canv.draw_text_current_line(f"{rarity.name}: {value}", drawing.WHITE_COLOR)
+            canv.new_line()
+
+    if len(data["tracked_items"]) > 0:
+        canv.draw_hline_top(color=drawing.WHITE_COLOR)
+
+    for item, value in data["tracked_items"].items():
+        canv.draw_text_current_line(f"{item}: {value}", drawing.WHITE_COLOR)
+        canv.new_line()
 
 
 def coroutine_draw_meter() -> PostRenderCoroutine:
@@ -172,28 +205,42 @@ def coroutine_draw_meter() -> PostRenderCoroutine:
         if not mod.is_enabled:
             return
         state = CounterState
-        if not state.is_enabled:
+        if (not state.is_enabled) or opt_show_example_ui.value:
             continue
         canvas = yield
-        canv.reset_state(canvas)
-        canv.draw_background()
-        canv.draw_text_current_line("Farming: " + state.current_farm, drawing.WHITE_COLOR)
-        canv.new_line()
-        canv.draw_text_current_line("Runs: " + str(state.run_data["runs"]), drawing.WHITE_COLOR)
-        canv.new_line()
-        canv.draw_hline_top(color=drawing.WHITE_COLOR)
+        draw_tracker(canvas, state.current_farm, state.run_data)
 
-        if state.run_data["show_rarity"]:
-            for rarity, value in state.run_data["tracked_rarities"].items():
-                canv.draw_text_current_line(f"{rarity.name}: {value}", drawing.WHITE_COLOR)
-                canv.new_line()
 
-        if len(state.run_data["tracked_items"]) > 0:
-            canv.draw_hline_top(color=drawing.WHITE_COLOR)
-
-        for item, value in state.run_data["tracked_items"].items():
-            canv.draw_text_current_line(f"{item}: {value}", drawing.WHITE_COLOR)
-            canv.new_line()
+# draw example meter when setting is enabled
+@hook("WillowGame.WillowGameViewportClient:PostRender", Type.POST)
+def draw_example_ui(
+    __obj: WillowGameViewportClient,
+    args: WillowGameViewportClient._PostRender.args,
+    __ret: WillowGameViewportClient._PostRender.ret,
+    __func: WillowGameViewportClient._PostRender,
+) -> None:
+    if not opt_show_example_ui.value:
+        return
+    canvas = args.Canvas
+    if canvas is None:
+        return
+    draw_tracker(
+        canvas,
+        "EXAMPLE UI",
+        {
+            "runs": 15,
+            "tracked_rarities": {
+                Rarity.Uniques: 10,
+                Rarity.Legendaries: 2,
+                Rarity.Pearlescents: 4,
+                Rarity.Seraphs: 0,
+                Rarity.Effervescents: 1,
+            },
+            "tracked_items": {"The Bee": 0, "Infinity": 1, "Unkempt Harold": 10},
+            "show_rarity": True,
+        },
+    )
+    drawing.draw_text_current_line("EXAMPLE UI - TOGGLE OFF AFTER CONFIGURATING", drawing.RED_COLOR)
 
 
 # (Re)load Game

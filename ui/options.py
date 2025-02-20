@@ -8,7 +8,8 @@ if TYPE_CHECKING:
 
 
 FONTS: dict[str, Font] = {
-    "willowhead": cast("Font", find_object("Font", "UI_Fonts.Font_Willowhead_8pt")),
+    # buggy
+    # "willowhead": cast("Font", find_object("Font", "UI_Fonts.Font_Willowhead_8pt")),
     "willowbody": cast("Font", find_object("Font", "ui_fonts.font_willowbody_18pt")),
     "hudmedium": cast("Font", find_object("Font", "UI_Fonts.Font_Hud_Medium")),
     "smallfont": cast("Font", find_object("Font", "EngineFonts.SmallFont")),

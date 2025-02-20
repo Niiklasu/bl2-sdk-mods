@@ -33,7 +33,6 @@ from .meter_options import (
     RHS_COLUMNS,
     ColorBy,
     ColumnType,
-    opt_grp_columns,
     opt_color_by,
     opt_show_bars,
     opt_show_class,
