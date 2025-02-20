@@ -54,7 +54,7 @@ class Drawing:
     def __init__(
         self,
         *,
-        options: type[BaseOptions],
+        options: type[BaseOptions] = BaseOptions,
         hidden_options: list[str] = [],
     ) -> None:
         self.options = options

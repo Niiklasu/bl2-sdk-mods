@@ -2,17 +2,12 @@ from ui_utils.option_box import OptionBoxButton
 
 opt_run = OptionBoxButton(
     name="Run Options",
-    tip="Menu for run options (create, load, list, delete, rename, reset)",
+    tip="Menu for run options (create, load, delete, rename, reset)",
 )
 
 opt_run_create = OptionBoxButton(
     name="Create Run",
     tip="Create a new run",
-)
-
-opt_run_list = OptionBoxButton(
-    name="List Runs",
-    tip="List all runs",
 )
 
 opt_run_load = OptionBoxButton(
@@ -44,18 +39,18 @@ opt_setcount = OptionBoxButton(
 )
 
 opt_setcount_run = OptionBoxButton(
-    name="Set Count",
+    name="Set Run Count",
     tip="Set the count of the current run",
 )
 
 opt_setcount_item = OptionBoxButton(
-    name="Set Count",
+    name="Set Item Count",
     tip="Set the count of a specific item",
 )
 
 opt_setcount_rarity = OptionBoxButton(
-    name="Set Count",
-    tip="Set the count of a specific rarity",
+    name="Set Rarity Count",
+    tip="Open the menu to set the count of a specific rarity",
 )
 
 
